@@ -12,7 +12,7 @@ use view::root_ui;
 
 #[tokio::main]
 async fn main() {
-    let main_window = WindowDesc::new(root_ui).title("Nostr Chat");
+    let main_window = WindowDesc::new(root_ui()).title("Nostr Chat");
     let laucher = AppLauncher::with_window(main_window).delegate(Delegate {});
 
     let init_state = State::new();
