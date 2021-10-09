@@ -1,10 +1,11 @@
 use druid::{
     im::{vector, Vector},
-    Data, Env, EventCtx, Lens,
+    Application, Data, Env, EventCtx, Lens,
 };
 use std::{
     fs::File,
     io::{BufReader, Error},
+    str::FromStr,
     sync::{Arc, Mutex},
 };
 
@@ -12,6 +13,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::delegate::{CONNECT, DELETE_CONTACT, SEND_MSG, START_CHAT};
 use tokio_tungstenite::tungstenite::Message;
+
+use secp256k1::{rand::rngs::OsRng, schnorrsig, Secp256k1, SecretKey};
 
 use crate::ws_service::connect;
 
@@ -37,6 +40,8 @@ impl ChatMsg {
 
 #[derive(Data, Clone, Lens)]
 pub struct State {
+    pub secret_key: String,
+    pub public_key: String,
     pub chat_messages: Vector<String>,
     pub msg_to_send: String,
     pub ws_url: String,
@@ -50,6 +55,8 @@ pub struct State {
 impl State {
     pub fn new() -> Self {
         State {
+            public_key: "".into(),
+            secret_key: "".into(),
             chat_messages: vector!(),
             msg_to_send: "".into(),
             ws_url: "".into(),
@@ -79,7 +86,28 @@ impl State {
     pub fn click_add_contact(ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         data.add_contact();
     }
+    pub fn click_copy_pk_to_clipboard(ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
+        let mut clipboard = Application::global().clipboard();
+        clipboard.put_string(data.public_key.clone());
+    }
+    pub fn click_generate_restore_sk(ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
+        data.generate_sk();
+    }
 
+    fn generate_sk(&mut self) {
+        let secp = Secp256k1::new();
+        let mut rng = OsRng::new().unwrap();
+
+        if let Ok(sk) = SecretKey::from_str(&self.secret_key) {
+            let keypair = schnorrsig::KeyPair::from_secret_key(&secp, sk);
+            let pk = schnorrsig::PublicKey::from_keypair(&secp, &keypair);
+            self.public_key = pk.to_string();
+        } else {
+            let (sk, pk) = secp.generate_keypair(&mut rng);
+            self.secret_key = sk.to_string();
+            self.public_key = pk.to_string()[2..].into();
+        };
+    }
     pub fn set_current_chat(&mut self, pk: &str) {
         for contact in self.contacts.iter() {
             if contact.pk == pk {

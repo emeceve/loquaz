@@ -1,6 +1,6 @@
 use druid::{
-    widget::{Button, Container, CrossAxisAlignment, Flex, Label, List, Scroll, Tabs, TextBox},
-    Data, EventCtx, UnitPoint, Vec2, Widget, WidgetExt,
+    widget::{Button, CrossAxisAlignment, Flex, Label, List, Scroll, Tabs, TextBox},
+    Application, Data, UnitPoint, Widget, WidgetExt,
 };
 
 use crate::data::{Contact, State, TxOrNull};
@@ -76,9 +76,42 @@ fn chat_contact_item() -> impl Widget<Contact> {
 fn config_tab() -> impl Widget<State> {
     let root = Flex::column();
 
-    root.with_child(relay_config())
+    root.with_child(key_config())
+        .with_child(relay_config())
         .with_child(new_contact())
         .with_child(contacts_list())
+}
+
+fn key_config() -> impl Widget<State> {
+    let sk_input = TextBox::new()
+        .with_placeholder("Restore or generate your secret key")
+        .expand_width()
+        .lens(State::secret_key);
+    let pk_label = TextBox::new()
+        .disabled_if(|_, _| true)
+        .expand_width()
+        .lens(State::public_key);
+
+    let generate_or_restore_btn =
+        Button::new("Generate/Restore").on_click(State::click_generate_restore_sk);
+
+    let copy_pk_btn = Button::new("Copy")
+        .on_click(State::click_copy_pk_to_clipboard)
+        .disabled_if(|data, _| data.public_key.len() == 0);
+
+    let forms = Flex::column()
+        .with_child(
+            Flex::row()
+                .with_flex_child(sk_input, 1.)
+                .with_child(generate_or_restore_btn),
+        )
+        .with_child(
+            Flex::row()
+                .with_flex_child(pk_label, 1.)
+                .with_child(copy_pk_btn),
+        );
+
+    config_group("Generate/Restore Keys", forms)
 }
 fn relay_config() -> impl Widget<State> {
     let text_box = TextBox::new()
