@@ -1,11 +1,11 @@
 use std::sync::{Arc, Mutex};
 
 use druid::{AppDelegate, ExtEventSink, Handled, Selector};
-use tokio::net::TcpStream;
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
 use crate::{
     data::{ChatMsg, State, TxOrNull},
+    nostr_service::handle_msg,
     ws_service::connect,
 };
 
@@ -14,6 +14,7 @@ pub const CONNECT: Selector<ExtEventSink> = Selector::new("nostr_client.connect"
 pub const SEND_MSG: Selector<ChatMsg> = Selector::new("nostr_client.send_msg");
 pub const DELETE_CONTACT: Selector<String> = Selector::new("nostr_client.delete_contact");
 pub const START_CHAT: Selector<String> = Selector::new("nostr_client.start_chat");
+pub const SELECT_CONV: Selector<String> = Selector::new("nostr_client.select_conv");
 //pub const CONNECTED: Selector<Arc<WebSocketStream<MaybeTlsStream<TcpStream>>>> =
 //    Selector::new("nostr-client.connected");
 
@@ -30,6 +31,7 @@ impl AppDelegate<State> for Delegate {
     ) -> druid::Handled {
         if let Some(val) = cmd.get(WS_RECEIVED_DATA) {
             data.push_new_msg(ChatMsg::new("", &val));
+            handle_msg(&val);
             Handled::Yes
         } else if let Some(ext_event_sink) = cmd.get(CONNECT) {
             let (tx, rx) = futures_channel::mpsc::unbounded();
@@ -51,6 +53,9 @@ impl AppDelegate<State> for Delegate {
             Handled::Yes
         } else if let Some(pk) = cmd.get(START_CHAT) {
             data.set_current_chat(pk);
+            Handled::Yes
+        } else if let Some(pk) = cmd.get(SELECT_CONV) {
+            data.set_conv(pk);
             Handled::Yes
         } else {
             Handled::No

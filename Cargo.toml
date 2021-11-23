@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 secp256k1 = { version = "0.20.3", features = ["rand", "rand-std", "serde"] }
-nostr = { git = "https://github.com/futurepaul/nostr-rs" }
+nostr = { git = "https://github.com/emeceve/nostr-rs" }
 url = "2.0.0"
 druid = { git = "https://github.com/linebender/druid.git", features = ["im"] }
 serde = { version = "1.0", features = ["derive"] }

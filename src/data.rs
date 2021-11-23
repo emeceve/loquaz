@@ -5,13 +5,14 @@ use druid::{
 use std::{
     fs::File,
     io::{BufReader, Error},
+    rc::Rc,
     str::FromStr,
     sync::{Arc, Mutex},
 };
 
 use serde::{Deserialize, Serialize};
 
-use crate::delegate::{CONNECT, DELETE_CONTACT, SEND_MSG, START_CHAT};
+use crate::delegate::{CONNECT, DELETE_CONTACT, SELECT_CONV, SEND_MSG, START_CHAT};
 use tokio_tungstenite::tungstenite::Message;
 
 use secp256k1::{rand::rngs::OsRng, schnorrsig, Secp256k1, SecretKey};
@@ -50,10 +51,19 @@ pub struct State {
     pub new_contact_alias: String,
     pub new_contact_pk: String,
     pub current_chat_contact: Contact,
+    pub conversations: Vector<Rc<Conversation>>,
+    pub selected_conv: Option<Rc<Conversation>>,
 }
 
 impl State {
     pub fn new() -> Self {
+        let contacts = Self::load_contacts_from_json();
+        let conversations = contacts
+            .clone()
+            .iter_mut()
+            .map(|contact| Rc::new(Conversation::new(contact.clone())))
+            .collect();
+
         State {
             public_key: "".into(),
             secret_key: "".into(),
@@ -61,10 +71,12 @@ impl State {
             msg_to_send: "".into(),
             ws_url: "".into(),
             tx: Arc::new(Mutex::new(TxOrNull::Null)),
-            contacts: Self::load_contacts_from_json(),
+            contacts,
             new_contact_pk: "".into(),
             new_contact_alias: "".into(),
             current_chat_contact: Contact::new("", ""),
+            conversations,
+            selected_conv: None,
         }
     }
 
@@ -72,29 +84,7 @@ impl State {
         self.chat_messages.push_front(new_msg.content);
     }
 
-    pub fn click_connect_ws(ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-        ctx.submit_command(CONNECT.with(ctx.get_external_handle()));
-    }
-
-    pub fn click_send_msg(ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-        let new_msg = ChatMsg::new(&data.current_chat_contact.pk, &data.msg_to_send);
-        data.push_new_msg(new_msg.clone());
-        ctx.submit_command(SEND_MSG.with(new_msg));
-        data.msg_to_send = "".into();
-    }
-
-    pub fn click_add_contact(ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-        data.add_contact();
-    }
-    pub fn click_copy_pk_to_clipboard(ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-        let mut clipboard = Application::global().clipboard();
-        clipboard.put_string(data.public_key.clone());
-    }
-    pub fn click_generate_restore_sk(ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-        data.generate_sk();
-    }
-
-    fn generate_sk(&mut self) {
+    pub fn generate_sk(&mut self) {
         let secp = Secp256k1::new();
         let mut rng = OsRng::new().unwrap();
 
@@ -117,8 +107,17 @@ impl State {
 
         println!("{:?}", self.current_chat_contact);
     }
+    pub fn set_conv(&mut self, pk: &str) {
+        for conv in self.conversations.iter() {
+            if conv.contact.pk == pk {
+                self.selected_conv = Some(Rc::clone(conv));
+            }
+        }
 
-    fn add_contact(&mut self) {
+        println!("{:?}", self.selected_conv.as_ref().unwrap());
+    }
+
+    pub fn add_contact(&mut self) {
         self.contacts
             .push_back(Contact::new(&self.new_contact_alias, &self.new_contact_pk));
         self.save_contacts_to_json().unwrap();
@@ -169,12 +168,38 @@ impl Contact {
             pk: pk.into(),
         }
     }
+}
 
-    pub fn click_delete(ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-        ctx.submit_command(DELETE_CONTACT.with(data.pk.clone()));
+#[derive(Clone, Data, Lens, Debug)]
+pub struct Conversation {
+    contact: Contact,
+    messages: Vector<Msg>,
+}
+
+impl Conversation {
+    pub fn new(contact: Contact) -> Self {
+        Self {
+            contact,
+            messages: vector![],
+        }
     }
 
-    pub fn click_start_chat(ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-        ctx.submit_command(START_CHAT.with(data.pk.clone()));
+    pub fn click_select_conv(ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
+        ctx.submit_command(SELECT_CONV.with(data.contact.pk.clone()));
+    }
+}
+
+#[derive(Clone, Data, Lens, Debug)]
+pub struct Msg {
+    source_pk: String,
+    content: String,
+}
+
+impl Msg {
+    pub fn new(source_pk: &str, content: &str) -> Self {
+        Self {
+            source_pk: source_pk.into(),
+            content: content.into(),
+        }
     }
 }

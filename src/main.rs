@@ -5,6 +5,8 @@ mod view;
 mod ws_service;
 use std::sync::{Arc, Mutex};
 
+mod pages;
+
 use data::{State, TxOrNull};
 use delegate::Delegate;
 use druid::{AppLauncher, WindowDesc};
