@@ -1,27 +1,28 @@
 use druid::{
     widget::{Button, CrossAxisAlignment, Flex, Label, List, Scroll, TextBox},
-    UnitPoint, Widget, WidgetExt,
+    LensExt, UnitPoint, Widget, WidgetExt,
 };
 
 use crate::{
-    data::{Contact, State},
+    data::{app_state::AppState, config::Config, contact::Contact},
     pages::chat::controller::ChatController,
 };
 
-pub fn chat_tab() -> impl Widget<State> {
+pub fn chat_tab() -> impl Widget<AppState> {
     let root = Flex::column();
 
     let mut lists = Flex::row().cross_axis_alignment(CrossAxisAlignment::Start);
 
     lists.add_flex_child(
-        Scroll::new(List::new(chat_contact_item).lens(State::contacts)).vertical(),
+        Scroll::new(List::new(chat_contact_item).lens(AppState::config.then(Config::contacts)))
+            .vertical(),
         1.0,
     );
 
     let msg_text_box = TextBox::new()
         .with_placeholder("Say hello")
         .expand_width()
-        .lens(State::msg_to_send);
+        .lens(AppState::msg_to_send);
 
     let send_btn = Button::new("Send").on_click(ChatController::click_send_msg);
 
@@ -29,7 +30,7 @@ pub fn chat_tab() -> impl Widget<State> {
         Flex::column()
             .with_child(
                 Label::new(|contact: &Contact, _env: &_| format!("{}", contact.alias))
-                    .lens(State::current_chat_contact),
+                    .lens(AppState::current_chat_contact),
             )
             .with_flex_child(
                 Scroll::new(List::new(|| {
@@ -40,7 +41,7 @@ pub fn chat_tab() -> impl Widget<State> {
                         .height(50.0)
                 }))
                 .vertical()
-                .lens(State::chat_messages),
+                .lens(AppState::chat_messages),
                 3.0,
             )
             .with_child(

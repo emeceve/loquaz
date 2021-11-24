@@ -2,7 +2,7 @@ use druid::{ExtEventSink, Target};
 use futures::StreamExt;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
-use crate::delegate::WS_RECEIVED_DATA;
+use crate::delegate::{CONNECTED_RELAY, WS_RECEIVED_DATA};
 
 pub async fn connect(
     event_sink: ExtEventSink,
@@ -11,9 +11,13 @@ pub async fn connect(
 ) {
     let url = url::Url::parse(&ws_url).unwrap();
 
-    println!("Trying to connect...");
+    println!("Trying to connect {} ...", url.to_string());
     let (ws_stream, _) = connect_async(&url).await.expect("Failed to connect!");
     println!("Successfully connected to relay {}!", &url.to_string());
+
+    event_sink
+        .submit_command(CONNECTED_RELAY, "", Target::Auto)
+        .expect("Error while trying to emit command CONNECTED_RELAY");
 
     let (ws_tx, mut ws_rx) = ws_stream.split();
 
