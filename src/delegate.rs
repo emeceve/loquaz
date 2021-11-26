@@ -1,11 +1,16 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    str::FromStr,
+    sync::{Arc, Mutex},
+};
 
 use druid::{AppDelegate, ExtEventSink, Handled, Selector};
+use nostr::Event;
+use secp256k1::{schnorrsig, SecretKey};
 use serde_json::json;
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
 use crate::{
-    data::app_state::{AppState, ChatMsg},
+    data::{app_state::AppState, conversation::ChatMsg},
     ws_service::connect,
 };
 
@@ -32,9 +37,23 @@ impl AppDelegate<AppState> for Delegate {
         env: &druid::Env,
     ) -> druid::Handled {
         if let Some(val) = cmd.get(WS_RECEIVED_DATA) {
-            //Todo change ChatMsg struct to Msg
-            data.push_new_msg(ChatMsg::new("", &val));
-            //        handle_msg(&val);
+            match nostr::RelayMessage::from_json(val) {
+                Ok(msg) => match msg {
+                    nostr::RelayMessage::Notice { message } => {
+                        println!("{}", message);
+                    }
+                    nostr::RelayMessage::Event {
+                        event,
+                        subscription_id,
+                    } => {
+                        //TODO: Necessary make pub content field
+                        data.push_new_msg(ChatMsg::new("", &event.content));
+                    }
+                },
+
+                Err(err) => println!("{}", err),
+            }
+
             Handled::Yes
         } else if let Some(ext_event_sink) = cmd.get(CONNECT) {
             data.config.save();
@@ -47,8 +66,13 @@ impl AppDelegate<AppState> for Delegate {
             ));
             Handled::Yes
         } else if let Some(msg) = cmd.get(SEND_MSG) {
-            //TODO convert message and pk to nostr NIP4
-            ctx.submit_command(SEND_WS_MSG.with(msg.content.clone()));
+            let dm = Event::new_encrypted_direct_msg(
+                SecretKey::from_str(&data.user.sk).unwrap(),
+                &schnorrsig::PublicKey::from_str(&msg.receiver_pk).unwrap(),
+                &msg.content,
+            );
+            let event_json_str = json!(["EVENT", dm]).to_string();
+            ctx.submit_command(SEND_WS_MSG.with(event_json_str));
             Handled::Yes
         } else if let Some(msg) = cmd.get(SEND_WS_MSG) {
             println!("Message ws to be sent: {}", msg);

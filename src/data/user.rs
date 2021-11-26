@@ -5,6 +5,7 @@ use secp256k1::{rand::OsRng, schnorrsig, Secp256k1, SecretKey};
 
 #[derive(Data, Clone, Lens)]
 pub struct User {
+    //TODO use typed keys structures
     pub sk: String,
     pub pk: String,
 }

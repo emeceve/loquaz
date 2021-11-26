@@ -4,34 +4,16 @@ use druid::{
 };
 use std::{
     rc::Rc,
-    str::FromStr,
     sync::{Arc, Mutex},
 };
 use uuid::Uuid;
 
 use tokio_tungstenite::tungstenite::Message;
 
-use secp256k1::{rand::rngs::OsRng, schnorrsig, Secp256k1, SecretKey};
-
 use crate::data::{contact::Contact, conversation::Conversation};
 use futures_channel::mpsc::{self, UnboundedSender};
 
-use super::{config::Config, user::User};
-
-#[derive(Clone)]
-pub struct ChatMsg {
-    pub receiver_pk: String,
-    pub content: String,
-}
-
-impl ChatMsg {
-    pub fn new(receiver_pk: &str, content: &str) -> Self {
-        Self {
-            receiver_pk: receiver_pk.into(),
-            content: content.into(),
-        }
-    }
-}
+use super::{config::Config, conversation::ChatMsg, user::User};
 
 #[derive(Data, Clone, Lens)]
 pub struct AppState {

@@ -34,3 +34,18 @@ impl Msg {
         }
     }
 }
+
+#[derive(Clone)]
+pub struct ChatMsg {
+    pub receiver_pk: String,
+    pub content: String,
+}
+
+impl ChatMsg {
+    pub fn new(receiver_pk: &str, content: &str) -> Self {
+        Self {
+            receiver_pk: receiver_pk.into(),
+            content: content.into(),
+        }
+    }
+}
