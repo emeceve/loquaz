@@ -4,8 +4,11 @@ use std::{
 };
 
 use druid::{AppDelegate, ExtEventSink, Handled, Selector};
-use nostr::Event;
-use secp256k1::{schnorrsig, SecretKey};
+use nostr::{util::nip04::decrypt, ClientMessage, Event};
+use secp256k1::{
+    schnorrsig::{self, PublicKey},
+    SecretKey,
+};
 use serde_json::json;
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
@@ -47,8 +50,18 @@ impl AppDelegate<AppState> for Delegate {
                         subscription_id,
                     } => {
                         //TODO: Necessary make pub content field
-                        data.push_new_msg(ChatMsg::new("", &event.content));
+                        match decrypt(
+                            &SecretKey::from_str(&data.user.sk).unwrap(),
+                            &event.pubkey,
+                            &event.content,
+                        ) {
+                            Ok(decrypted_msg) => {
+                                data.push_new_msg(ChatMsg::new("", &decrypted_msg))
+                            }
+                            Err(error) => eprintln!("{}", error),
+                        };
                     }
+                    nostr::RelayMessage::Empty => println!("Empty message"),
                 },
 
                 Err(err) => println!("{}", err),
@@ -67,12 +80,15 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else if let Some(msg) = cmd.get(SEND_MSG) {
             let dm = Event::new_encrypted_direct_msg(
-                SecretKey::from_str(&data.user.sk).unwrap(),
-                &schnorrsig::PublicKey::from_str(&msg.receiver_pk).unwrap(),
+                // TODO is there a better way to deal with an Arc than all these as_refs?
+                data.user.keys.as_ref().unwrap().as_ref(),
+                &nostr::Keys::new_pub_only(&msg.receiver_pk).unwrap(),
                 &msg.content,
             );
-            let event_json_str = json!(["EVENT", dm]).to_string();
-            ctx.submit_command(SEND_WS_MSG.with(event_json_str));
+
+            let ev = ClientMessage::new_event(dm.unwrap());
+
+            ctx.submit_command(SEND_WS_MSG.with(ev.to_json()));
             Handled::Yes
         } else if let Some(msg) = cmd.get(SEND_WS_MSG) {
             println!("Message ws to be sent: {}", msg);
@@ -88,9 +104,15 @@ impl AppDelegate<AppState> for Delegate {
 
             let authors = data.get_authors();
             let id = data.gen_sub_id();
-            let req_sub = json!(["REQ", id, { "authors": authors, "kind": 4 }]).to_string();
+            let req_sub = nostr::ClientMessage::new_req(
+                id,
+                nostr::SubscriptionFilter::new()
+                    .authors(authors)
+                    .kind(nostr::Kind::EncryptedDirectMessage).tag_p(data.user.keys.as_ref().unwrap().as_ref().public_key),
+            );
+            // let req_sub = json!(["REQ", id, { "authors": authors, "kind": 4 }]).to_string();
             println!("Sending subscription REQ");
-            ctx.submit_command(SEND_WS_MSG.with(req_sub.to_string()));
+            ctx.submit_command(SEND_WS_MSG.with(req_sub.to_json()));
 
             Handled::Yes
         } else if let Some(pk) = cmd.get(DELETE_CONTACT) {

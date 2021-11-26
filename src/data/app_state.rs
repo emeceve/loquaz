@@ -2,8 +2,10 @@ use druid::{
     im::{vector, Vector},
     Data, Lens,
 };
+use secp256k1::schnorrsig::PublicKey;
 use std::{
     rc::Rc,
+    str::FromStr,
     sync::{Arc, Mutex},
 };
 use uuid::Uuid;
@@ -55,12 +57,13 @@ impl AppState {
         }
     }
 
-    pub fn get_authors(&self) -> Vec<String> {
+    //TODO: use PublicKey in contact
+    pub fn get_authors(&self) -> Vec<PublicKey> {
         self.config
             .contacts
             .clone()
             .into_iter()
-            .map(|c| c.pk)
+            .map(|c| PublicKey::from_str(&c.pk).unwrap())
             .collect()
     }
 

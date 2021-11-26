@@ -42,6 +42,7 @@ pub async fn connect(
         //let data_to_str = std::str::from_utf8(data.as_ref()).unwrap();
         let data_to_str = String::from_utf8(data).unwrap();
         println!("[Received data]: {}", &data_to_str);
+        //TODO: propagate errors
         event_sink
             .submit_command(WS_RECEIVED_DATA, data_to_str, Target::Auto)
             .expect("Error");

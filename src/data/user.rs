@@ -1,13 +1,13 @@
-use std::str::FromStr;
+use std::sync::Arc;
 
 use druid::{Data, Lens};
-use secp256k1::{rand::OsRng, schnorrsig, Secp256k1, SecretKey};
 
 #[derive(Data, Clone, Lens)]
 pub struct User {
     //TODO use typed keys structures
     pub sk: String,
     pub pk: String,
+    pub keys: Option<Arc<nostr::Keys>>,
 }
 
 impl User {
@@ -15,26 +15,25 @@ impl User {
         Self {
             sk: sk.into(),
             pk: pk.into(),
+            keys: None,
         }
     }
 
     pub fn generate_keys_from_sk(&mut self) {
-        let secp = Secp256k1::new();
-        if let Ok(sk) = SecretKey::from_str(&self.sk) {
-            let keypair = schnorrsig::KeyPair::from_secret_key(&secp, sk);
-            let pk = schnorrsig::PublicKey::from_keypair(&secp, &keypair);
-            self.sk = sk.to_string();
-            self.pk = pk.to_string();
+        if let Ok(keys) = nostr::Keys::new(&self.sk) {
+            self.keys = Some(Arc::new(keys.clone()));
+            self.pk = keys.public_key_as_str();
         } else {
             self.generate_keys();
         }
     }
 
     pub fn generate_keys(&mut self) {
-        let secp = Secp256k1::new();
-        let mut rng = OsRng::new().unwrap();
-        let (sk, pk) = secp.generate_keypair(&mut rng);
-        self.sk = sk.to_string();
-        self.pk = pk.to_string()[2..].into();
+        // TODO fix this in nostr-rs, should panic if os random fails
+        let keys = nostr::Keys::generate_from_os_random().unwrap();
+        self.keys = Some(Arc::new(keys.clone()));
+
+        self.pk = keys.public_key_as_str();
+        self.sk = keys.secret_key_as_str().expect("'Should return SK");
     }
 }
