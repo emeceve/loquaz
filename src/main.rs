@@ -3,6 +3,7 @@ mod view;
 mod ws_service;
 
 mod broker;
+mod components;
 mod core;
 mod data;
 mod pages;

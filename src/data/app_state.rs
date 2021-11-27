@@ -16,6 +16,8 @@ use crate::{broker::BrokerEvent, core::config::Contact};
 use futures_channel::mpsc::{self, UnboundedSender};
 
 use super::{
+    conversation::{ChatMsg, Msg},
+    router::Route,
     state::{
         config_state::ConfigState,
         contact_state::ContactState,
@@ -40,6 +42,7 @@ pub struct AppState {
     pub conversations: HashMap<String, ConversationState>,
     pub selected_conv: Option<ConversationState>,
     sub_id: String,
+    pub route: Route,
 }
 
 impl AppState {
@@ -63,6 +66,7 @@ impl AppState {
             sub_id: "".into(),
             config,
             user: User::new("", ""),
+            route: Route::Chat,
         }
     }
 

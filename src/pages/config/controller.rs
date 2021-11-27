@@ -12,9 +12,7 @@ impl ConfigController {
         // ctx.submit_command(CONNECT.with(ctx.get_external_handle()));
         data.add_relay_url();
     }
-    pub fn click_add_contact(ctx: &mut EventCtx, data: &mut AppState, _env: &Env) {
-        data.add_contact();
-    }
+
     pub fn click_copy_pk_to_clipboard(ctx: &mut EventCtx, data: &mut AppState, _env: &Env) {
         let mut clipboard = Application::global().clipboard();
         clipboard.put_string(data.user.pk.clone());

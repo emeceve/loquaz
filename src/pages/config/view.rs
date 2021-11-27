@@ -3,10 +3,13 @@ use druid::{
     Data, LensExt, Widget, WidgetExt,
 };
 
-use crate::data::{
-    app_state::AppState,
-    state::{config_state::ConfigState, contact_state::ContactState},
-    user::User,
+use crate::{
+    data::{
+        app_state::AppState,
+        state::{config_state::ConfigState, contact_state::ContactState},
+        user::User,
+    },
+    pages::contacts::controller::ContactsController,
 };
 
 use super::controller::ConfigController;
@@ -98,7 +101,7 @@ fn new_contact() -> impl Widget<AppState> {
         .lens(AppState::new_contact_pk);
 
     let add_btn = Button::new("Add")
-        .on_click(ConfigController::click_add_contact)
+        .on_click(ContactsController::click_add_contact)
         .padding(5.0);
 
     config_group(
