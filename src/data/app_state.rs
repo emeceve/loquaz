@@ -1,5 +1,5 @@
 use druid::{
-    im::{vector, Vector},
+    im::{vector, HashMap, Vector},
     Data, Lens,
 };
 use secp256k1::schnorrsig::PublicKey;
@@ -15,8 +15,13 @@ use tokio_tungstenite::tungstenite::Message;
 use crate::data::{contact::Contact, conversation::Conversation};
 use futures_channel::mpsc::{self, UnboundedSender};
 
-use super::{config::Config, conversation::ChatMsg, user::User};
+use super::{
+    config::Config,
+    conversation::{ChatMsg, Msg},
+    user::User,
+};
 
+// TODO: look into druid's Arcstr because we can use that for some of these
 #[derive(Data, Clone, Lens)]
 pub struct AppState {
     pub chat_messages: Vector<String>,
@@ -27,21 +32,18 @@ pub struct AppState {
     pub new_contact_alias: String,
     pub new_contact_pk: String,
     pub current_chat_contact: Contact,
-    pub conversations: Vector<Rc<Conversation>>,
-    pub selected_conv: Option<Rc<Conversation>>,
+    pub conversations: HashMap<String, Conversation>,
+    pub selected_conv: Option<Conversation>,
     sub_id: String,
 }
 
 impl AppState {
     pub fn new() -> Self {
         let config = Config::load();
-        let conversations = config
-            .contacts
-            .clone()
-            .iter_mut()
-            .map(|contact| Rc::new(Conversation::new(contact.clone())))
-            .collect();
-
+        let mut conversations = HashMap::new();
+        for i in config.contacts.iter() {
+            conversations.insert(i.pk.clone(), Conversation::new(i.clone()));
+        }
         Self {
             chat_messages: vector!(),
             msg_to_send: "".into(),
@@ -73,6 +75,16 @@ impl AppState {
         id
     }
 
+    pub fn push_conv_msg(&mut self, msg: &Msg, conversation_pk: &str) {
+        match self.conversations.get_mut(conversation_pk) {
+            Some(conv) => conv.push_msg(msg),
+            None => println!("Conversation not found!"),
+        }
+        if self.selected_conv.is_some() {
+            self.selected_conv.as_mut().unwrap().push_msg(msg);
+        }
+    }
+
     pub fn push_new_msg(&mut self, new_msg: ChatMsg) {
         self.chat_messages.push_front(new_msg.content);
     }
@@ -91,10 +103,14 @@ impl AppState {
         println!("{:?}", self.current_chat_contact);
     }
     pub fn set_conv(&mut self, pk: &str) {
-        for conv in self.conversations.iter() {
-            if conv.contact.pk == pk {
-                self.selected_conv = Some(Rc::clone(conv));
-            }
+        //        for conv in self.conversations.iter() {
+        //            if conv.contact.pk == pk {
+        //                self.selected_conv = Some(Rc::clone(conv));
+        //            }
+        //        }
+        match self.conversations.get_mut(pk) {
+            Some(conv) => self.selected_conv = Some(conv.clone()),
+            None => println!("Conversation not found!"),
         }
 
         println!("{:?}", self.selected_conv.as_ref().unwrap());

@@ -8,8 +8,10 @@ use super::contact::Contact;
 #[derive(Clone, Data, Lens, Debug)]
 pub struct Conversation {
     pub contact: Contact,
-    messages: Vector<Msg>,
+    pub messages: Vector<Msg>,
 }
+
+// let conversation = HashMap<pk, Conversation>
 
 impl Conversation {
     pub fn new(contact: Contact) -> Self {
@@ -18,12 +20,16 @@ impl Conversation {
             messages: vector![],
         }
     }
+
+    pub fn push_msg(&mut self, msg: &Msg) {
+        self.messages.push_front(msg.clone());
+    }
 }
 
 #[derive(Clone, Data, Lens, Debug)]
 pub struct Msg {
-    source_pk: String,
-    content: String,
+    pub source_pk: String,
+    pub content: String,
 }
 
 impl Msg {
@@ -35,7 +41,7 @@ impl Msg {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ChatMsg {
     pub receiver_pk: String,
     pub content: String,

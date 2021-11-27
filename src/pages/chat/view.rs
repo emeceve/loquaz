@@ -1,12 +1,31 @@
 use druid::{
-    widget::{Button, CrossAxisAlignment, Flex, Label, List, Scroll, TextBox},
-    LensExt, UnitPoint, Widget, WidgetExt,
+    widget::{Button, CrossAxisAlignment, Either, Flex, Label, List, Maybe, Scroll, TextBox},
+    Lens, LensExt, UnitPoint, Widget, WidgetExt,
 };
 
 use crate::{
-    data::{app_state::AppState, config::Config, contact::Contact},
+    data::{
+        app_state::AppState,
+        config::Config,
+        contact::Contact,
+        conversation::{Conversation, Msg},
+    },
     pages::chat::controller::ChatController,
 };
+
+// struct ConversationLens;
+
+// impl Lens<Option<Conversation>, Conversation> for ConversationLens {
+//     fn with<R, F: FnOnce(&Option<Conversation>) -> R>(&self, data: &Option<Conversation>, f: F) -> R {
+//         f(&data.unwrap())
+//     }
+
+//     fn with_mut<R, F: FnOnce(&mut Option<Conversation>) -> R>(&self, data: &mut Option<Conversation>, f: F) -> R {
+//         f(&mut data.unwrap())
+//     }
+// }
+
+// one sec let's comment this out going to try something else real quick
 
 pub fn chat_tab() -> impl Widget<AppState> {
     let root = Flex::column();
@@ -33,15 +52,19 @@ pub fn chat_tab() -> impl Widget<AppState> {
                     .lens(AppState::current_chat_contact),
             )
             .with_flex_child(
-                Scroll::new(List::new(|| {
-                    Label::new(|msg: &String, _env: &_| format!("{}", msg))
-                        .align_vertical(UnitPoint::LEFT)
-                        .padding(10.0)
-                        .expand()
-                        .height(50.0)
-                }))
-                .vertical()
-                .lens(AppState::chat_messages),
+                //                Either::new(
+                //                    |data: &AppState, _env| match data.selected_conv {
+                //                        Some(_) => true,
+                //                        None => false,
+                //                    },
+                //                    chat_conversation().lens(AppState::selected_conv.map(
+                //                        |conv| conv.clone().unwrap(),
+                //                        |_mutconv, _updatedconv| conv.clone().unwrap(),
+                //                    )),
+                //                    Label::new("False"),
+                //
+                Maybe::new(|| chat_conversation(), || Label::new("False"))
+                    .lens(AppState::selected_conv),
                 3.0,
             )
             .with_child(
@@ -54,6 +77,17 @@ pub fn chat_tab() -> impl Widget<AppState> {
     );
 
     root.with_flex_child(lists, 1.0)
+}
+fn chat_conversation() -> impl Widget<Conversation> {
+    Scroll::new(List::new(|| {
+        Label::new(|msg: &Msg, _env: &_| format!("{}", msg.content))
+            .align_vertical(UnitPoint::LEFT)
+            .padding(10.0)
+            .expand()
+            .height(50.0)
+    }))
+    .vertical()
+    .lens(Conversation::messages)
 }
 
 fn chat_contact_item() -> impl Widget<Contact> {
@@ -68,5 +102,5 @@ fn chat_contact_item() -> impl Widget<Contact> {
             .lens(Contact::pk),
         )
         .with_default_spacer()
-        .on_click(ChatController::click_start_chat)
+        .on_click(ChatController::click_select_conv)
 }

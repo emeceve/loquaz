@@ -5,15 +5,14 @@ use std::{
 
 use druid::{AppDelegate, ExtEventSink, Handled, Selector};
 use nostr::{util::nip04::decrypt, ClientMessage, Event};
-use secp256k1::{
-    schnorrsig::{self, PublicKey},
-    SecretKey,
-};
-use serde_json::json;
-use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
+use secp256k1::SecretKey;
+use tokio_tungstenite::tungstenite::Message;
 
 use crate::{
-    data::{app_state::AppState, conversation::ChatMsg},
+    data::{
+        app_state::AppState,
+        conversation::{ChatMsg, Msg},
+    },
     ws_service::connect,
 };
 
@@ -47,16 +46,37 @@ impl AppDelegate<AppState> for Delegate {
                     }
                     nostr::RelayMessage::Event {
                         event,
-                        subscription_id,
+                        subscription_id: _,
                     } => {
-                        //TODO: Necessary make pub content field
                         match decrypt(
                             &SecretKey::from_str(&data.user.sk).unwrap(),
                             &event.pubkey,
                             &event.content,
                         ) {
                             Ok(decrypted_msg) => {
-                                data.push_new_msg(ChatMsg::new("", &decrypted_msg))
+                                let user_pk = &data.user.keys.clone().unwrap().public_key;
+                                let mut author: String = "".into();
+                                let mut conversation_pk: String = "".into();
+                                //If I am the author
+                                if event.pubkey == *user_pk {
+                                    event.tags.iter().for_each(|e| {
+                                        if e.kind() == "p" {
+                                            author = user_pk.to_string().clone();
+                                            conversation_pk = e.content().clone().to_string();
+                                        }
+                                    })
+                                } else {
+                                    author = event.pubkey.clone().to_string();
+                                    conversation_pk = event.pubkey.clone().to_string();
+                                }
+
+                                //Prevents the situations where "p" tag is missing
+                                if !author.is_empty() {
+                                    data.push_conv_msg(
+                                        &Msg::new(&author, &decrypted_msg),
+                                        &conversation_pk,
+                                    );
+                                }
                             }
                             Err(error) => eprintln!("{}", error),
                         };
@@ -79,6 +99,7 @@ impl AppDelegate<AppState> for Delegate {
             ));
             Handled::Yes
         } else if let Some(msg) = cmd.get(SEND_MSG) {
+            dbg!(&msg);
             let dm = Event::new_encrypted_direct_msg(
                 // TODO is there a better way to deal with an Arc than all these as_refs?
                 data.user.keys.as_ref().unwrap().as_ref(),
@@ -108,7 +129,8 @@ impl AppDelegate<AppState> for Delegate {
                 id,
                 nostr::SubscriptionFilter::new()
                     .authors(authors)
-                    .kind(nostr::Kind::EncryptedDirectMessage).tag_p(data.user.keys.as_ref().unwrap().as_ref().public_key),
+                    .kind(nostr::Kind::EncryptedDirectMessage)
+                    .tag_p(data.user.keys.as_ref().unwrap().as_ref().public_key),
             );
             // let req_sub = json!(["REQ", id, { "authors": authors, "kind": 4 }]).to_string();
             println!("Sending subscription REQ");

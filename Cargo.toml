@@ -1,16 +1,16 @@
 [package]
-name = "druid-ws"
+name = "nostr-chat"
 version = "0.1.0"
-authors = ["study"]
+authors = ["Emeceve <emeceve@outlook.com>"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 secp256k1 = { version = "0.20.3", features = ["rand", "rand-std", "serde"] }
-nostr = { git = "https://github.com/futurepaul/nostr-rs" }
+nostr = { git = "https://github.com/futurepaul/nostr-rs", commit = "a936c6d" }
 url = "2.0.0"
-druid = { git = "https://github.com/linebender/druid.git", features = ["im"] }
+druid = { git = "https://github.com/linebender/druid.git", features = ["im"], commit = "8d829c5" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 uuid = { version = "0.8.1", features = ["serde", "v4"] }
