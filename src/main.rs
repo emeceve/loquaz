@@ -6,19 +6,27 @@ mod broker;
 mod components;
 mod core;
 mod data;
+mod menus;
 mod pages;
+mod theme;
 
 use std::sync::Arc;
 
 use broker::start_broker;
 use data::{app_state::AppState, state::config_state::ConfigState};
 use delegate::Delegate;
-use druid::{AppLauncher, WindowDesc};
+use druid::{AppLauncher, WidgetExt, WindowDesc};
+use menus::ContextMenuController;
 use view::root_ui;
 
 #[tokio::main]
 async fn main() {
-    let main_window = WindowDesc::new(root_ui()).title("Nostr Chat");
+    let main_window = WindowDesc::new(root_ui().controller(ContextMenuController))
+        .title("Nostr Chat")
+        // .menu(menus::make_menu)
+        .menu(menus::make_menu)
+        .window_size((480., 480.))
+        .with_min_size((480., 480.));
     let laucher = AppLauncher::with_window(main_window).delegate(Delegate {});
 
     //Init state
@@ -30,6 +38,8 @@ async fn main() {
     //Spawn broker
     tokio::spawn(start_broker(laucher.get_external_handle(), receiver));
 
-    //Launch druid app
-    laucher.launch(init_state).expect("Failed to start");
+    laucher
+        .configure_env(theme::set_env())
+        .launch(init_state)
+        .expect("Failed to start");
 }

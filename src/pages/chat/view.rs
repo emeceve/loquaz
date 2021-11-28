@@ -4,6 +4,7 @@ use druid::{
 };
 
 use crate::{
+    components::button::button,
     data::{
         app_state::AppState,
         state::{
@@ -33,7 +34,8 @@ pub fn chat_tab() -> impl Widget<AppState> {
         .expand_width()
         .lens(AppState::msg_to_send);
 
-    let send_btn = Button::new("Send").on_click(ChatController::click_send_msg);
+    // let send_btn = Button::new("Send").on_click(ChatController::click_send_msg);
+    let send_btn = button("SEND").on_click(ChatController::click_send_msg);
 
     lists.add_flex_child(
         Flex::column()
