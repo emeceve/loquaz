@@ -3,7 +3,11 @@ use druid::{
     Data, LensExt, Widget, WidgetExt,
 };
 
-use crate::data::{app_state::AppState, config::Config, contact::Contact, user::User};
+use crate::data::{
+    app_state::AppState,
+    state::{config_state::ConfigState, contact_state::ContactState},
+    user::User,
+};
 
 use super::controller::ConfigController;
 
@@ -12,6 +16,7 @@ pub fn config_tab() -> impl Widget<AppState> {
 
     root.with_child(key_config())
         .with_child(relay_config())
+        .with_child(relays_list())
         .with_child(new_contact())
         .with_child(contacts_list())
 }
@@ -51,15 +56,33 @@ fn relay_config() -> impl Widget<AppState> {
     let text_box = TextBox::new()
         .with_placeholder("wss://example.com")
         .expand_width()
-        .lens(AppState::config.then(Config::ws_url));
-    let connect_btn = Button::new("Connect").on_click(ConfigController::click_connect_ws);
+        .lens(AppState::new_relay_ulr);
+    let connect_btn = Button::new("Add").on_click(ConfigController::click_add_relay_url);
 
     config_group(
-        "Relay config",
+        "New Relay",
         Flex::row()
             .with_flex_child(text_box, 1.)
             .with_child(connect_btn),
     )
+}
+fn relays_list() -> impl Widget<AppState> {
+    let list = Scroll::new(List::new(|| {
+        let url = Label::new(|url: &String, _: &_| format!("{}", url)).expand_width();
+        let del_btn = Button::new("Delete").on_click(ConfigController::click_remove_relay);
+        let con_btn = Button::new("Connect").on_click(ConfigController::click_connect_relay);
+        let discon_btn =
+            Button::new("Disconnect").on_click(ConfigController::click_disconnect_relay);
+        Flex::row()
+            .with_flex_child(url, 1.0)
+            .with_child(del_btn)
+            .with_child(discon_btn)
+            .with_child(con_btn)
+    }))
+    .vertical()
+    .lens(AppState::config.then(ConfigState::relays_url));
+
+    config_group("Relays", list)
 }
 fn new_contact() -> impl Widget<AppState> {
     let alias_input = TextBox::new()
@@ -87,16 +110,17 @@ fn new_contact() -> impl Widget<AppState> {
     )
 }
 fn contacts_list() -> impl Widget<AppState> {
-    let list = Scroll::new(List::new(contact_item).lens(AppState::config.then(Config::contacts)))
-        .vertical();
+    let list =
+        Scroll::new(List::new(contact_item).lens(AppState::config.then(ConfigState::contacts)))
+            .vertical();
 
     config_group("Contacts", list)
 }
 
-fn contact_item() -> impl Widget<Contact> {
-    let alias = Label::raw().lens(Contact::alias).expand_width();
-    let pk = Label::raw().lens(Contact::pk).expand_width();
-    let del_btn = Button::new("Delete").on_click(ConfigController::click_delete);
+fn contact_item() -> impl Widget<ContactState> {
+    let alias = Label::raw().lens(ContactState::alias).expand_width();
+    let pk = Label::raw().lens(ContactState::pk).expand_width();
+    let del_btn = Button::new("Delete").on_click(ConfigController::click_remove_contact);
 
     Flex::row()
         .with_flex_child(alias, 1.0)

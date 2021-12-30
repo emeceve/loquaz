@@ -8,7 +8,7 @@ edition = "2021"
 
 [dependencies]
 secp256k1 = { version = "0.20.3", features = ["rand", "rand-std", "serde"] }
-nostr = { git = "https://github.com/futurepaul/nostr-rs", commit = "a936c6d" }
+nostr = { git = "https://github.com/emeceve/nostr-rs", commit = "7abc973" }
 url = "2.0.0"
 druid = { git = "https://github.com/linebender/druid.git", features = ["im"], commit = "8d829c5" }
 serde = { version = "1.0", features = ["derive"] }
@@ -20,3 +20,4 @@ tokio = { version = "1.0.0", features = ["full"] }
 futures-channel = "0.3"
 futures = "0.3"
 home = "0.5.3"
+thiserror = "1.0.29"

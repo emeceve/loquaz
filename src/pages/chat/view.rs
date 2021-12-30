@@ -1,14 +1,16 @@
 use druid::{
-    widget::{Button, CrossAxisAlignment, Either, Flex, Label, List, Maybe, Scroll, TextBox},
-    Lens, LensExt, UnitPoint, Widget, WidgetExt,
+    widget::{Button, CrossAxisAlignment, Flex, Label, List, Maybe, Scroll, TextBox},
+    LensExt, UnitPoint, Widget, WidgetExt,
 };
 
 use crate::{
     data::{
         app_state::AppState,
-        config::Config,
-        contact::Contact,
-        conversation::{Conversation, Msg},
+        state::{
+            config_state::ConfigState,
+            contact_state::ContactState,
+            conversation_state::{ConversationState, MsgState},
+        },
     },
     pages::chat::controller::ChatController,
 };
@@ -33,8 +35,10 @@ pub fn chat_tab() -> impl Widget<AppState> {
     let mut lists = Flex::row().cross_axis_alignment(CrossAxisAlignment::Start);
 
     lists.add_flex_child(
-        Scroll::new(List::new(chat_contact_item).lens(AppState::config.then(Config::contacts)))
-            .vertical(),
+        Scroll::new(
+            List::new(chat_contact_item).lens(AppState::config.then(ConfigState::contacts)),
+        )
+        .vertical(),
         1.0,
     );
 
@@ -48,7 +52,7 @@ pub fn chat_tab() -> impl Widget<AppState> {
     lists.add_flex_child(
         Flex::column()
             .with_child(
-                Label::new(|contact: &Contact, _env: &_| format!("{}", contact.alias))
+                Label::new(|contact: &ContactState, _env: &_| format!("{}", contact.alias))
                     .lens(AppState::current_chat_contact),
             )
             .with_flex_child(
@@ -78,28 +82,28 @@ pub fn chat_tab() -> impl Widget<AppState> {
 
     root.with_flex_child(lists, 1.0)
 }
-fn chat_conversation() -> impl Widget<Conversation> {
+fn chat_conversation() -> impl Widget<ConversationState> {
     Scroll::new(List::new(|| {
-        Label::new(|msg: &Msg, _env: &_| format!("{}", msg.content))
+        Label::new(|msg: &MsgState, _env: &_| format!("{}", msg.content))
             .align_vertical(UnitPoint::LEFT)
             .padding(10.0)
             .expand()
             .height(50.0)
     }))
     .vertical()
-    .lens(Conversation::messages)
+    .lens(ConversationState::messages)
 }
 
-fn chat_contact_item() -> impl Widget<Contact> {
+fn chat_contact_item() -> impl Widget<ContactState> {
     Flex::column()
-        .with_child(Label::raw().lens(Contact::alias))
+        .with_child(Label::raw().lens(ContactState::alias))
         .with_child(
             Label::new(|pk: &String, _env: &_| {
                 let mut truncate_str = String::from(pk);
                 truncate_str.truncate(6);
                 format!("{}...", truncate_str)
             })
-            .lens(Contact::pk),
+            .lens(ContactState::pk),
         )
         .with_default_spacer()
         .on_click(ChatController::click_select_conv)

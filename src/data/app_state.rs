@@ -12,12 +12,15 @@ use uuid::Uuid;
 
 use tokio_tungstenite::tungstenite::Message;
 
-use crate::data::{contact::Contact, conversation::Conversation};
+use crate::{broker::BrokerEvent, core::entities::contact::Contact, relay::RelayTaskHandle};
 use futures_channel::mpsc::{self, UnboundedSender};
 
 use super::{
-    config::Config,
-    conversation::{ChatMsg, Msg},
+    state::{
+        config_state::ConfigState,
+        contact_state::ContactState,
+        conversation_state::{ChatMsgState, ConversationState, MsgState},
+    },
     user::User,
 };
 
@@ -26,36 +29,42 @@ use super::{
 pub struct AppState {
     pub chat_messages: Vector<String>,
     pub msg_to_send: String,
+    pub relay: Option<Rc<RelayTaskHandle>>,
     pub tx: Arc<Mutex<Option<UnboundedSender<Message>>>>,
-    pub config: Config,
+    pub sender_broker: Arc<Option<tokio::sync::mpsc::Sender<BrokerEvent>>>,
+    pub config: ConfigState,
     pub user: User,
     pub new_contact_alias: String,
     pub new_contact_pk: String,
-    pub current_chat_contact: Contact,
-    pub conversations: HashMap<String, Conversation>,
-    pub selected_conv: Option<Conversation>,
+    pub new_relay_ulr: String,
+    pub current_chat_contact: ContactState,
+    pub conversations: HashMap<String, ConversationState>,
+    pub selected_conv: Option<ConversationState>,
     sub_id: String,
 }
 
 impl AppState {
     pub fn new() -> Self {
-        let config = Config::load();
+        let config = ConfigState::new();
         let mut conversations = HashMap::new();
         for i in config.contacts.iter() {
-            conversations.insert(i.pk.clone(), Conversation::new(i.clone()));
+            conversations.insert(i.pk.clone(), ConversationState::new(i.clone()));
         }
         Self {
             chat_messages: vector!(),
             msg_to_send: "".into(),
             tx: Arc::new(Mutex::new(None)),
+            sender_broker: Arc::new(None),
             new_contact_pk: "".into(),
             new_contact_alias: "".into(),
-            current_chat_contact: Contact::new("", ""),
+            new_relay_ulr: "".into(),
+            current_chat_contact: ContactState::new("", ""),
             conversations,
             selected_conv: None,
             sub_id: "".into(),
             config,
             user: User::new("", ""),
+            relay: None,
         }
     }
 
@@ -75,7 +84,7 @@ impl AppState {
         id
     }
 
-    pub fn push_conv_msg(&mut self, msg: &Msg, conversation_pk: &str) {
+    pub fn push_conv_msg(&mut self, msg: &MsgState, conversation_pk: &str) {
         match self.conversations.get_mut(conversation_pk) {
             Some(conv) => conv.push_msg(msg),
             None => println!("Conversation not found!"),
@@ -85,12 +94,20 @@ impl AppState {
         }
     }
 
-    pub fn push_new_msg(&mut self, new_msg: ChatMsg) {
+    pub fn push_new_msg(&mut self, new_msg: ChatMsgState) {
         self.chat_messages.push_front(new_msg.content);
     }
 
     pub fn generate_sk(&mut self) {
         self.user.generate_keys_from_sk();
+        let sender = (*self.sender_broker).clone();
+        let pk = self.user.pk.clone();
+        tokio::spawn(async move {
+            sender
+                .unwrap()
+                .send(crate::broker::BrokerEvent::SubscribeInRelays { pk })
+                .await;
+        });
     }
 
     pub fn set_current_chat(&mut self, pk: &str) {
@@ -116,14 +133,59 @@ impl AppState {
         println!("{:?}", self.selected_conv.as_ref().unwrap());
     }
 
+    pub fn add_relay_url(&mut self) {
+        let sender = (*self.sender_broker).clone();
+        let url_clone = String::from(&self.new_relay_ulr);
+        tokio::spawn(async move {
+            sender
+                .unwrap()
+                .send(crate::broker::BrokerEvent::AddRelay { url: url_clone })
+                .await;
+        });
+        self.new_relay_ulr = "".into();
+    }
+    pub fn remove_relay(&mut self, relay_url: &str) {
+        let sender = (*self.sender_broker).clone();
+        let url_clone = String::from(relay_url);
+        tokio::spawn(async move {
+            sender
+                .unwrap()
+                .send(crate::broker::BrokerEvent::RemoveRelay { url: url_clone })
+                .await;
+        });
+    }
+    pub fn connect_relay(&mut self, relay_url: &str) {
+        let sender = (*self.sender_broker).clone();
+        let url_clone = String::from(relay_url);
+        tokio::spawn(async move {
+            sender
+                .unwrap()
+                .send(crate::broker::BrokerEvent::ConnectRelay { url: url_clone })
+                .await;
+        });
+    }
+
     pub fn add_contact(&mut self) {
-        self.config
-            .add_contact(&Contact::new(&self.new_contact_alias, &self.new_contact_pk));
+        let sender = (*self.sender_broker).clone();
+        let new_contact = Contact::new(&self.new_contact_alias, &self.new_contact_pk);
+        tokio::spawn(async move {
+            sender
+                .unwrap()
+                .send(crate::broker::BrokerEvent::AddContact { new_contact })
+                .await;
+        });
         self.new_contact_alias = "".into();
         self.new_contact_pk = "".into();
     }
 
-    pub fn delete_contact(&mut self, pk: &str) {
-        self.config.delete_contact(&pk);
+    pub fn delete_contact(&mut self, contact_state: &ContactState) {
+        let sender = (*self.sender_broker).clone();
+        let contact = Contact::new(&contact_state.alias, &contact_state.pk);
+        tokio::spawn(async move {
+            sender
+                .unwrap()
+                .send(crate::broker::BrokerEvent::RemoveContact { contact })
+                .await;
+        });
     }
 }

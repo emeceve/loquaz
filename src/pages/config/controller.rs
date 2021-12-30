@@ -1,15 +1,16 @@
 use druid::{Application, Env, EventCtx};
 
 use crate::{
-    data::{app_state::AppState, contact::Contact},
-    delegate::{CONNECT, DELETE_CONTACT},
+    data::{app_state::AppState, state::contact_state::ContactState},
+    delegate::{CONNECT, CONNECT_RELAY, DISCONNECT_RELAY, REMOVE_CONTACT, REMOVE_RELAY},
 };
 
 pub struct ConfigController {}
 
 impl ConfigController {
-    pub fn click_connect_ws(ctx: &mut EventCtx, data: &mut AppState, _env: &Env) {
-        ctx.submit_command(CONNECT.with(ctx.get_external_handle()));
+    pub fn click_add_relay_url(ctx: &mut EventCtx, data: &mut AppState, _env: &Env) {
+        // ctx.submit_command(CONNECT.with(ctx.get_external_handle()));
+        data.add_relay_url();
     }
     pub fn click_add_contact(ctx: &mut EventCtx, data: &mut AppState, _env: &Env) {
         data.add_contact();
@@ -21,8 +22,16 @@ impl ConfigController {
     pub fn click_generate_restore_sk(ctx: &mut EventCtx, data: &mut AppState, _env: &Env) {
         data.generate_sk();
     }
-
-    pub fn click_delete(ctx: &mut EventCtx, data: &mut Contact, _env: &Env) {
-        ctx.submit_command(DELETE_CONTACT.with(data.pk.clone()));
+    pub fn click_remove_relay(ctx: &mut EventCtx, data: &mut String, _env: &Env) {
+        ctx.submit_command(REMOVE_RELAY.with(data.clone()));
+    }
+    pub fn click_connect_relay(ctx: &mut EventCtx, data: &mut String, _env: &Env) {
+        ctx.submit_command(CONNECT_RELAY.with(data.clone()));
+    }
+    pub fn click_disconnect_relay(ctx: &mut EventCtx, data: &mut String, _env: &Env) {
+        ctx.submit_command(DISCONNECT_RELAY.with(data.clone()));
+    }
+    pub fn click_remove_contact(ctx: &mut EventCtx, data: &mut ContactState, _env: &Env) {
+        ctx.submit_command(REMOVE_CONTACT.with(data.clone()));
     }
 }

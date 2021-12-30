@@ -1,29 +1,34 @@
-use std::{
-    str::FromStr,
-    sync::{Arc, Mutex},
-};
+use std::{rc::Rc, str::FromStr, sync::Arc};
 
 use druid::{AppDelegate, ExtEventSink, Handled, Selector};
 use nostr::{util::nip04::decrypt, ClientMessage, Event};
 use secp256k1::SecretKey;
-use tokio_tungstenite::tungstenite::Message;
 
 use crate::{
+    core::core::CoreTaskHandleEvent,
     data::{
         app_state::AppState,
-        conversation::{ChatMsg, Msg},
+        state::{
+            config_state::ConfigState,
+            contact_state::ContactState,
+            conversation_state::{ChatMsgState, MsgState},
+        },
     },
-    ws_service::connect,
+    relay::RelayTaskHandle,
 };
 
 pub const WS_RECEIVED_DATA: Selector<String> = Selector::new("nost_client.received_data");
 pub const CONNECT: Selector<ExtEventSink> = Selector::new("nostr_client.connect");
-pub const SEND_MSG: Selector<ChatMsg> = Selector::new("nostr_client.send_msg");
+pub const SEND_MSG: Selector<ChatMsgState> = Selector::new("nostr_client.send_msg");
 pub const SEND_WS_MSG: Selector<String> = Selector::new("nostr_client.send_ws_msg");
-pub const DELETE_CONTACT: Selector<String> = Selector::new("nostr_client.delete_contact");
+pub const REMOVE_CONTACT: Selector<ContactState> = Selector::new("nostr_client.delete_contact");
+pub const REMOVE_RELAY: Selector<String> = Selector::new("nostr_client.remove_relay");
+pub const CONNECT_RELAY: Selector<String> = Selector::new("nostr_client.connect_relay");
+pub const DISCONNECT_RELAY: Selector<String> = Selector::new("nostr_client.disconnect_relay");
 pub const START_CHAT: Selector<String> = Selector::new("nostr_client.start_chat");
 pub const SELECT_CONV: Selector<String> = Selector::new("nostr_client.select_conv");
 pub const CONNECTED_RELAY: Selector<&str> = Selector::new("nostr_client.connected_relay");
+pub const CORE_EV: Selector<CoreTaskHandleEvent> = Selector::new("nostr_client.core_ev");
 //pub const CONNECTED: Selector<Arc<WebSocketStream<MaybeTlsStream<TcpStream>>>> =
 //    Selector::new("nostr-client.connected");
 
@@ -38,7 +43,22 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         env: &druid::Env,
     ) -> druid::Handled {
-        if let Some(val) = cmd.get(WS_RECEIVED_DATA) {
+        if let Some(ev) = cmd.get(CORE_EV) {
+            println!("Received core event: {:?}", ev);
+            //            match ev {
+            //                CoreTaskHandleEvent::ConfigLoaded(res) => match res {
+            //                    Ok(conf) => data.config = ConfigState::from_entity(conf),
+            //                    Err(err) => println!("{}", err),
+            //                },
+            //                CoreTaskHandleEvent::ContactAdded(res) => match res {
+            //                    Ok(_) => println!("Contact added"),
+            //                    Err(err) => println!("{}", err),
+            //                },
+            //                CoreTaskHandleEvent::ReceivedEvent { ev } => println!("Received event"),
+            //                CoreTaskHandleEvent::RelayAdded(res) => println!("RelayAdded"),
+            //            }
+            Handled::Yes
+        } else if let Some(val) = cmd.get(WS_RECEIVED_DATA) {
             match nostr::RelayMessage::from_json(val) {
                 Ok(msg) => match msg {
                     nostr::RelayMessage::Notice { message } => {
@@ -73,7 +93,7 @@ impl AppDelegate<AppState> for Delegate {
                                 //Prevents the situations where "p" tag is missing
                                 if !author.is_empty() {
                                     data.push_conv_msg(
-                                        &Msg::new(&author, &decrypted_msg),
+                                        &MsgState::new(&author, &decrypted_msg),
                                         &conversation_pk,
                                     );
                                 }
@@ -89,14 +109,26 @@ impl AppDelegate<AppState> for Delegate {
 
             Handled::Yes
         } else if let Some(ext_event_sink) = cmd.get(CONNECT) {
-            data.config.save();
-            let (tx, rx) = futures_channel::mpsc::unbounded();
-            data.tx = Arc::new(Mutex::new(Some(tx)));
-            tokio::spawn(connect(
-                ext_event_sink.clone(),
-                data.config.ws_url.clone(),
-                rx,
-            ));
+            // data.config.save();
+
+            //    ctx.submit_command(CONNECTED_RELAY.with(""));
+            //            let sender = (*data.sender_broker).clone();
+            //            let url = data.config.ws_url.clone();
+            //            if let Some(tx) = sender {
+            //                tokio::spawn(async move {
+            //                    tx.send(crate::broker::BrokerEvent::AddRelay { url: url })
+            //                        .await;
+            //                });
+            //            }
+
+            //            tokio::spawn(data.relay.as_mut().unwrap().connect());
+            //            let (tx, rx) = futures_channel::mpsc::unbounded();
+            //            data.tx = Arc::new(Mutex::new(Some(tx)));
+            //            tokio::spawn(connect(
+            //                ext_event_sink.clone(),
+            //                data.config.ws_url.clone(),
+            //                rx,
+            //            ));
             Handled::Yes
         } else if let Some(msg) = cmd.get(SEND_MSG) {
             dbg!(&msg);
@@ -113,11 +145,14 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else if let Some(msg) = cmd.get(SEND_WS_MSG) {
             println!("Message ws to be sent: {}", msg);
-            match &*data.tx.lock().unwrap() {
+            match data.relay.as_ref() {
                 None => {
                     println!("Null")
                 }
-                Some(tx) => tx.unbounded_send(Message::binary(msg.as_bytes())).unwrap(),
+                Some(relay) => {
+                    let relay_clone = relay.clone();
+                    relay_clone.send_msg(msg.clone());
+                }
             }
             Handled::Yes
         } else if let Some(_) = cmd.get(CONNECTED_RELAY) {
@@ -127,18 +162,33 @@ impl AppDelegate<AppState> for Delegate {
             let id = data.gen_sub_id();
             let req_sub = nostr::ClientMessage::new_req(
                 id,
-                nostr::SubscriptionFilter::new()
+                vec![nostr::SubscriptionFilter::new()
                     .authors(authors)
                     .kind(nostr::Kind::EncryptedDirectMessage)
-                    .tag_p(data.user.keys.as_ref().unwrap().as_ref().public_key),
+                    .tag_p(data.user.keys.as_ref().unwrap().as_ref().public_key)],
             );
-            // let req_sub = json!(["REQ", id, { "authors": authors, "kind": 4 }]).to_string();
             println!("Sending subscription REQ");
             ctx.submit_command(SEND_WS_MSG.with(req_sub.to_json()));
 
             Handled::Yes
-        } else if let Some(pk) = cmd.get(DELETE_CONTACT) {
-            data.delete_contact(pk);
+        } else if let Some(contact_state) = cmd.get(REMOVE_CONTACT) {
+            data.delete_contact(contact_state);
+            Handled::Yes
+        } else if let Some(url) = cmd.get(REMOVE_RELAY) {
+            data.remove_relay(url);
+            Handled::Yes
+        } else if let Some(url) = cmd.get(CONNECT_RELAY) {
+            data.connect_relay(url);
+            Handled::Yes
+        } else if let Some(url) = cmd.get(DISCONNECT_RELAY) {
+            let sender = (*data.sender_broker).clone();
+            let url_clone = String::from(url);
+            tokio::spawn(async move {
+                sender
+                    .unwrap()
+                    .send(crate::broker::BrokerEvent::DisconnectRelay { url: url_clone })
+                    .await;
+            });
             Handled::Yes
         } else if let Some(pk) = cmd.get(START_CHAT) {
             data.set_current_chat(pk);
