@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use tokio_tungstenite::tungstenite::Message;
 
-use crate::{broker::BrokerEvent, core::entities::contact::Contact, relay::RelayTaskHandle};
+use crate::{broker::BrokerEvent, core::config::Contact};
 use futures_channel::mpsc::{self, UnboundedSender};
 
 use super::{
@@ -29,7 +29,6 @@ use super::{
 pub struct AppState {
     pub chat_messages: Vector<String>,
     pub msg_to_send: String,
-    pub relay: Option<Rc<RelayTaskHandle>>,
     pub tx: Arc<Mutex<Option<UnboundedSender<Message>>>>,
     pub sender_broker: Arc<Option<tokio::sync::mpsc::Sender<BrokerEvent>>>,
     pub config: ConfigState,
@@ -64,7 +63,6 @@ impl AppState {
             sub_id: "".into(),
             config,
             user: User::new("", ""),
-            relay: None,
         }
     }
 
@@ -167,25 +165,31 @@ impl AppState {
 
     pub fn add_contact(&mut self) {
         let sender = (*self.sender_broker).clone();
-        let new_contact = Contact::new(&self.new_contact_alias, &self.new_contact_pk);
-        tokio::spawn(async move {
-            sender
-                .unwrap()
-                .send(crate::broker::BrokerEvent::AddContact { new_contact })
-                .await;
-        });
-        self.new_contact_alias = "".into();
-        self.new_contact_pk = "".into();
+        if let Ok(pk) = PublicKey::from_str(&self.new_contact_pk) {
+            let new_contact = Contact::new(&self.new_contact_alias, pk);
+            tokio::spawn(async move {
+                sender
+                    .unwrap()
+                    .send(crate::broker::BrokerEvent::AddContact { new_contact })
+                    .await;
+            });
+            self.new_contact_alias = "".into();
+            self.new_contact_pk = "".into();
+        } else {
+            eprintln!("Bad public key!");
+        }
     }
 
     pub fn delete_contact(&mut self, contact_state: &ContactState) {
-        let sender = (*self.sender_broker).clone();
-        let contact = Contact::new(&contact_state.alias, &contact_state.pk);
-        tokio::spawn(async move {
-            sender
-                .unwrap()
-                .send(crate::broker::BrokerEvent::RemoveContact { contact })
-                .await;
-        });
+        if let Ok(pk) = PublicKey::from_str(&contact_state.pk) {
+            let sender = (*self.sender_broker).clone();
+            let contact = Contact::new(&contact_state.alias, pk);
+            tokio::spawn(async move {
+                sender
+                    .unwrap()
+                    .send(crate::broker::BrokerEvent::RemoveContact { contact })
+                    .await;
+            });
+        }
     }
 }

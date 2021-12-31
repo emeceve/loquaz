@@ -1,6 +1,4 @@
 mod delegate;
-mod nostr_service;
-mod relay;
 mod view;
 mod ws_service;
 
@@ -28,20 +26,8 @@ async fn main() {
     let (sender, mut receiver) = tokio::sync::mpsc::channel(32);
     init_state.sender_broker = Arc::new(Some(sender));
 
-    //Instantiate core handle and load config
-    let core_handle = core::core::CoreTaskHandle::new();
-    if let core::core::CoreTaskHandleEvent::ConfigLoaded(Ok(conf)) =
-        core_handle.load_configs().await
-    {
-        init_state.config = ConfigState::from_entity(&conf);
-    }
-
     //Spawn broker
-    tokio::spawn(start_broker(
-        laucher.get_external_handle(),
-        receiver,
-        core_handle,
-    ));
+    tokio::spawn(start_broker(laucher.get_external_handle(), receiver));
 
     //Launch druid app
     laucher.launch(init_state).expect("Failed to start");

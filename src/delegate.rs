@@ -5,7 +5,7 @@ use nostr::{util::nip04::decrypt, ClientMessage, Event};
 use secp256k1::SecretKey;
 
 use crate::{
-    core::core::CoreTaskHandleEvent,
+    broker::BrokerNotification,
     data::{
         app_state::AppState,
         state::{
@@ -14,7 +14,6 @@ use crate::{
             conversation_state::{ChatMsgState, MsgState},
         },
     },
-    relay::RelayTaskHandle,
 };
 
 pub const WS_RECEIVED_DATA: Selector<String> = Selector::new("nost_client.received_data");
@@ -28,7 +27,7 @@ pub const DISCONNECT_RELAY: Selector<String> = Selector::new("nostr_client.disco
 pub const START_CHAT: Selector<String> = Selector::new("nostr_client.start_chat");
 pub const SELECT_CONV: Selector<String> = Selector::new("nostr_client.select_conv");
 pub const CONNECTED_RELAY: Selector<&str> = Selector::new("nostr_client.connected_relay");
-pub const CORE_EV: Selector<CoreTaskHandleEvent> = Selector::new("nostr_client.core_ev");
+pub const BROKER_NOTI: Selector<BrokerNotification> = Selector::new("nostr_client.broker_noti");
 //pub const CONNECTED: Selector<Arc<WebSocketStream<MaybeTlsStream<TcpStream>>>> =
 //    Selector::new("nostr-client.connected");
 
@@ -43,20 +42,12 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         env: &druid::Env,
     ) -> druid::Handled {
-        if let Some(ev) = cmd.get(CORE_EV) {
-            println!("Received core event: {:?}", ev);
-            //            match ev {
-            //                CoreTaskHandleEvent::ConfigLoaded(res) => match res {
-            //                    Ok(conf) => data.config = ConfigState::from_entity(conf),
-            //                    Err(err) => println!("{}", err),
-            //                },
-            //                CoreTaskHandleEvent::ContactAdded(res) => match res {
-            //                    Ok(_) => println!("Contact added"),
-            //                    Err(err) => println!("{}", err),
-            //                },
-            //                CoreTaskHandleEvent::ReceivedEvent { ev } => println!("Received event"),
-            //                CoreTaskHandleEvent::RelayAdded(res) => println!("RelayAdded"),
-            //            }
+        if let Some(note) = cmd.get(BROKER_NOTI) {
+            match note {
+                BrokerNotification::ConfigUpdated { config } => {
+                    data.config = config.to_owned();
+                }
+            }
             Handled::Yes
         } else if let Some(val) = cmd.get(WS_RECEIVED_DATA) {
             match nostr::RelayMessage::from_json(val) {
@@ -145,15 +136,15 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else if let Some(msg) = cmd.get(SEND_WS_MSG) {
             println!("Message ws to be sent: {}", msg);
-            match data.relay.as_ref() {
-                None => {
-                    println!("Null")
-                }
-                Some(relay) => {
-                    let relay_clone = relay.clone();
-                    relay_clone.send_msg(msg.clone());
-                }
-            }
+            //           match data.relay.as_ref() {
+            //               None => {
+            //                   println!("Null")
+            //               }
+            //               Some(relay) => {
+            //                   let relay_clone = relay.clone();
+            //                   relay_clone.send_msg(msg.clone());
+            //               }
+            //           }
             Handled::Yes
         } else if let Some(_) = cmd.get(CONNECTED_RELAY) {
             println!("Connected to relay");

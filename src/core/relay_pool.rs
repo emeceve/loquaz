@@ -1,48 +1,123 @@
 use std::collections::HashMap;
 
 use futures::{SinkExt, StreamExt};
-use nostr::{self, SubscriptionFilter};
+use nostr::{self, Event, RelayMessage, SubscriptionFilter};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
-use super::subscription::{Channel, Subscription};
+use super::subscription::Subscription;
+
+pub struct RelayPoolTask {
+    receiver: Receiver<RelayPoolEv>,
+    notification_sender: Sender<RelayPoolNotifications>,
+    events: HashMap<String, Event>,
+}
+
+impl RelayPoolTask {
+    pub fn new(
+        pool_task_receiver: Receiver<RelayPoolEv>,
+        notification_sender: Sender<RelayPoolNotifications>,
+    ) -> Self {
+        Self {
+            receiver: pool_task_receiver,
+            events: HashMap::new(),
+            notification_sender,
+        }
+    }
+
+    async fn handle_message(&mut self, msg: RelayPoolEv) {
+        match msg {
+            RelayPoolEv::ReceivedMsg { relay_url, msg } => {
+                println!("Received message from {}: {:?}", relay_url, msg);
+                match msg {
+                    RelayMessage::Event {
+                        event,
+                        subscription_id,
+                    } => {
+                        //Verifies if the event is valid
+                        if let Ok(_) = event.verify() {
+                            //Adds only new events
+                            if let None = self.events.insert(event.id.to_string(), event.clone()) {
+                                println!("New event, propagates");
+                                self.notification_sender
+                                    .send(RelayPoolNotifications::ReceivedEvent { ev: event })
+                                    .await;
+                            }
+                        }
+                    }
+                    _ => (),
+                }
+            }
+            _ => (),
+        }
+    }
+}
+
+async fn start_relay_pool_task(mut task: RelayPoolTask) {
+    while let Some(msg) = task.receiver.recv().await {
+        task.handle_message(msg).await;
+    }
+}
 
 pub struct RelayPool {
     relays: HashMap<String, Relay>,
-    pool_receiver: Receiver<RelayPoolEv>,
-    pool_sender: Sender<RelayPoolEv>,
+    pool_task_sender: Sender<RelayPoolEv>,
     subscription: Subscription,
 }
 
 impl RelayPool {
-    pub fn new() -> Self {
-        let (sender, receiver) = mpsc::channel(32);
+    pub fn new(notification_sender: Sender<RelayPoolNotifications>) -> Self {
+        let (sender, receiver) = mpsc::channel(64);
+        let relay_pool_task = RelayPoolTask::new(receiver, notification_sender);
+        tokio::spawn(start_relay_pool_task(relay_pool_task));
         Self {
             relays: HashMap::new(),
-            pool_receiver: receiver,
-            pool_sender: sender,
+            pool_task_sender: sender,
             subscription: Subscription::new(),
         }
     }
     pub fn add(&mut self, relay_url: &str) {
         self.relays.insert(
             relay_url.clone().into(),
-            Relay::new(relay_url, self.pool_sender.clone()),
+            Relay::new(relay_url, self.pool_task_sender.clone()),
         );
+    }
+
+    pub fn list_relays(&self) -> Vec<Relay> {
+        self.relays.iter().map(|(k, v)| v.to_owned()).collect()
     }
 
     pub async fn start_sub(&mut self, filters: Vec<SubscriptionFilter>) {
         self.subscription.update_filters(filters.clone());
-        for (k, v) in self.relays.iter() {
-            match v.status {
+        let relays_clone = self.relays.clone();
+        for (k, _) in relays_clone.iter() {
+            self.subscribe_relay(k).await;
+        }
+    }
+
+    async fn subscribe_relay(&mut self, url: &str) {
+        if let Some(relay) = self.relays.get(url) {
+            match relay.status {
                 RelayStatus::Connected => {
-                    let channel = Channel::new(&v.url);
-                    v.send_msg(nostr::ClientMessage::new_req(
-                        channel.id.clone(),
-                        filters.clone(),
-                    ))
-                    .await;
-                    self.subscription.add_channel(channel);
+                    let channel = self.subscription.get_channel(url);
+                    relay
+                        .send_msg(nostr::ClientMessage::new_req(
+                            channel.id.clone(),
+                            self.subscription.get_filters(),
+                        ))
+                        .await;
+                }
+                _ => (),
+            }
+        }
+    }
+    async fn unsubscribe_relay(&mut self, url: &str) {
+        if let Some(relay) = self.relays.get(url) {
+            match relay.status {
+                RelayStatus::Connected => {
+                    if let Some(ch) = self.subscription.remove_channel(url) {
+                        relay.send_msg(nostr::ClientMessage::close(ch.id)).await;
+                    }
                 }
                 _ => (),
             }
@@ -51,16 +126,18 @@ impl RelayPool {
 
     pub async fn connect_relay(&mut self, url: &str) {
         self.relays.get_mut(url.into()).unwrap().connect().await;
+        self.subscribe_relay(url).await;
     }
     pub async fn disconnect_relay(&mut self, url: &str) {
+        self.unsubscribe_relay(url).await;
         self.relays.get_mut(url.into()).unwrap().disconnect().await;
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Relay {
-    url: String,
-    status: RelayStatus,
+    pub url: String,
+    pub status: RelayStatus,
     pool_sender: Sender<RelayPoolEv>,
     relay_sender: Option<Sender<RelayEv>>,
 }
@@ -111,7 +188,7 @@ impl Relay {
                     Ok(msg) => {
                         let data = msg.into_data();
                         let data_to_str = String::from_utf8(data).unwrap();
-                        println!("Received data {}", &data_to_str);
+                        //   println!("Received data {}", &data_to_str);
                         match nostr::RelayMessage::from_json(&data_to_str) {
                             Ok(msg) => {
                                 //                               println!("[Received RelayMsg]: {}", &msg.to_json());
@@ -132,9 +209,11 @@ impl Relay {
                     Err(err) => println!("{}", err),
                 }
             }
-            pool_sender.send(RelayPoolEv::RelayDisconnected {
-                relay_url: relay_url.clone(),
-            });
+            pool_sender
+                .send(RelayPoolEv::RelayDisconnected {
+                    relay_url: relay_url.clone(),
+                })
+                .await;
             println!("Closed WS RX to RELAY POOL TX {}", relay_url);
         });
     }
@@ -155,7 +234,7 @@ impl Relay {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RelayStatus {
     Disconnected,
     Connected,
@@ -171,6 +250,10 @@ pub enum RelayPoolEv {
         relay_url: String,
         msg: nostr::RelayMessage,
     },
+}
+pub enum RelayPoolNotifications {
+    ReceivedEvent { ev: Event },
+    RelaysStatusChanged { relays: Vec<Relay> },
 }
 
 #[derive(Debug)]
