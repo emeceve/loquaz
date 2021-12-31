@@ -128,7 +128,9 @@ impl AppState {
         //            }
         //        }
         match self.conversations.get_mut(pk) {
-            Some(conv) => self.selected_conv = Some(conv.clone()),
+            Some(conv) => {
+                self.selected_conv = Some(conv.clone());
+            }
             None => println!("Conversation not found!"),
         }
 

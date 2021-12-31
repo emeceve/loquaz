@@ -1,6 +1,9 @@
 use druid::{
-    widget::{Button, CrossAxisAlignment, Flex, Label, List, Maybe, Scroll, TextBox},
-    LensExt, UnitPoint, Widget, WidgetExt,
+    theme::WINDOW_BACKGROUND_COLOR,
+    widget::{
+        Button, CrossAxisAlignment, Either, Flex, Label, List, Maybe, Painter, Scroll, TextBox,
+    },
+    Color, Lens, LensExt, RenderContext, UnitPoint, Widget, WidgetExt,
 };
 
 use crate::{
@@ -72,6 +75,21 @@ fn chat_conversation() -> impl Widget<ConversationState> {
 }
 
 fn chat_contact_item() -> impl Widget<ContactState> {
+    let painter = Painter::new(move |ctx, data: &ContactState, env| {
+        // let selected = data.is_selected;
+        let selected = true;
+
+        let bounds = ctx.size().to_rect();
+
+        if ctx.is_hot() {
+            ctx.fill(bounds, &Color::rgb8(20, 20, 20));
+        } else if selected {
+            ctx.fill(bounds, &Color::BLACK);
+        } else {
+            ctx.fill(bounds, &env.get(WINDOW_BACKGROUND_COLOR));
+        }
+    });
+
     Flex::column()
         .with_child(Label::raw().lens(ContactState::alias))
         .with_child(
@@ -82,6 +100,8 @@ fn chat_contact_item() -> impl Widget<ContactState> {
             })
             .lens(ContactState::pk),
         )
-        .with_default_spacer()
+        .padding(20.)
+        .background(painter)
+        // .with_default_spacer()
         .on_click(ChatController::click_select_conv)
 }
