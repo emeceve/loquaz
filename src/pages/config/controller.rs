@@ -17,8 +17,11 @@ impl ConfigController {
         let mut clipboard = Application::global().clipboard();
         clipboard.put_string(data.user.pk.clone());
     }
-    pub fn click_generate_restore_sk(ctx: &mut EventCtx, data: &mut AppState, _env: &Env) {
+    pub fn click_generate_sk(ctx: &mut EventCtx, data: &mut AppState, _env: &Env) {
         data.generate_sk();
+    }
+    pub fn click_restore_sk(ctx: &mut EventCtx, data: &mut AppState, _env: &Env) {
+        data.restore_sk();
     }
     pub fn click_remove_relay(ctx: &mut EventCtx, data: &mut String, _env: &Env) {
         ctx.submit_command(REMOVE_RELAY.with(data.clone()));

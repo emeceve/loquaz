@@ -1,4 +1,5 @@
 pub mod button;
+pub mod header;
 pub mod icons;
 pub mod nav;
 

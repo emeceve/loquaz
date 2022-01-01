@@ -64,7 +64,7 @@ impl AppState {
             sub_id: "".into(),
             config,
             user: User::new("", ""),
-            route: Route::Chat,
+            route: Route::Settings,
         }
     }
 
@@ -96,6 +96,24 @@ impl AppState {
 
     pub fn push_new_msg(&mut self, new_msg: ChatMsgState) {
         self.chat_messages.push_front(new_msg.content);
+    }
+
+    pub fn restore_sk(&mut self) {
+        let old_pk = self.user.pk.clone();
+        self.user.restore_keys_from_sk();
+        let pk = self.user.pk.clone();
+
+        if old_pk == pk {
+            eprintln!("that's the same pk bro")
+        } else {
+            let sender = (*self.sender_broker).clone();
+            tokio::spawn(async move {
+                sender
+                    .unwrap()
+                    .send(crate::broker::BrokerEvent::SubscribeInRelays { pk })
+                    .await;
+            });
+        }
     }
 
     pub fn generate_sk(&mut self) {

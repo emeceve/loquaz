@@ -19,10 +19,18 @@ impl User {
         }
     }
 
-    pub fn generate_keys_from_sk(&mut self) {
+    pub fn restore_keys_from_sk(&mut self) {
         if let Ok(keys) = nostr::Keys::new(&self.sk) {
             self.keys = Some(Arc::new(keys.clone()));
             self.pk = keys.public_key_as_str();
+        } else {
+            eprintln!("No sk to generate keys from")
+        }
+    }
+
+    pub fn generate_keys_from_sk(&mut self) {
+        if let Ok(keys) = nostr::Keys::new(&self.sk) {
+            eprintln!("There's already a sk")
         } else {
             self.generate_keys();
         }
