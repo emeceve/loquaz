@@ -5,7 +5,7 @@ use crate::{
     pages::{chat::view::chat_tab, contacts::view::contacts_tab},
 };
 use druid::{
-    widget::{Flex, Tabs, ViewSwitcher},
+    widget::{Flex, ViewSwitcher},
     Widget, WidgetExt,
 };
 

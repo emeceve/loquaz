@@ -5,9 +5,7 @@ use druid::{
 
 use crate::data::{
     app_state::AppState,
-    contact::Contact,
     state::{config_state::ConfigState, contact_state::ContactState},
-    user::User,
 };
 
 use super::controller::ContactsController;

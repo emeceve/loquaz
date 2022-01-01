@@ -1,9 +1,7 @@
 use druid::{
     theme::WINDOW_BACKGROUND_COLOR,
-    widget::{
-        Button, CrossAxisAlignment, Either, Flex, Label, List, Maybe, Painter, Scroll, TextBox,
-    },
-    Color, Lens, LensExt, RenderContext, UnitPoint, Widget, WidgetExt,
+    widget::{CrossAxisAlignment, Flex, Label, List, Maybe, Painter, Scroll, TextBox},
+    Color, LensExt, RenderContext, UnitPoint, Widget, WidgetExt,
 };
 
 use crate::{

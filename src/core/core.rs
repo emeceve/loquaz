@@ -6,7 +6,7 @@ use nostr::Event;
 use secp256k1::schnorrsig::PublicKey;
 use std::str::FromStr;
 use thiserror::Error;
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::mpsc::{self, Receiver};
 
 //####### Core Task Handle Errors  #########
 #[derive(Debug, Error)]

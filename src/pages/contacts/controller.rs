@@ -1,13 +1,14 @@
-use druid::{Application, Env, EventCtx};
+use druid::{Env, EventCtx};
 
 use crate::{
     data::{app_state::AppState, state::contact_state::ContactState},
-    delegate::{CONNECT, CONNECT_RELAY, DISCONNECT_RELAY, REMOVE_CONTACT, REMOVE_RELAY},
+    delegate::REMOVE_CONTACT,
 };
 
 pub struct ContactsController {}
 
 impl ContactsController {
+    // TODO why isn't this command based?
     pub fn click_add_contact(ctx: &mut EventCtx, data: &mut AppState, _env: &Env) {
         data.add_contact();
     }

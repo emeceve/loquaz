@@ -1,10 +1,5 @@
-use druid::{
-    lens::Unit,
-    widget::{Svg, SvgData, WidgetExt},
-    LensExt,
-};
+use druid::widget::WidgetExt;
 
-use super::NostrWidget;
 use crate::{data::app_state::AppState, theme};
 
 use druid::{kurbo::BezPath, widget::prelude::*, Affine, Color, KeyOrValue, Size};

@@ -13,7 +13,7 @@ mod theme;
 use std::sync::Arc;
 
 use broker::start_broker;
-use data::{app_state::AppState, state::config_state::ConfigState};
+use data::app_state::AppState;
 use delegate::Delegate;
 use druid::{AppLauncher, WidgetExt, WindowDesc};
 use menus::ContextMenuController;

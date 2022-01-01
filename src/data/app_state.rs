@@ -4,7 +4,6 @@ use druid::{
 };
 use secp256k1::schnorrsig::PublicKey;
 use std::{
-    rc::Rc,
     str::FromStr,
     sync::{Arc, Mutex},
 };
@@ -13,10 +12,9 @@ use uuid::Uuid;
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::{broker::BrokerEvent, core::config::Contact};
-use futures_channel::mpsc::{self, UnboundedSender};
+use futures_channel::mpsc::UnboundedSender;
 
 use super::{
-    conversation::{ChatMsg, Msg},
     router::Route,
     state::{
         config_state::ConfigState,
