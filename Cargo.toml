@@ -8,9 +8,9 @@ edition = "2021"
 
 [dependencies]
 secp256k1 = { version = "0.20.3", features = ["rand", "rand-std", "serde"] }
-nostr = { git = "https://github.com/emeceve/nostr-rs", commit = "7abc973" }
+nostr = { git = "https://github.com/futurepaul/nostr-rs", commit = "7abc973" }
 url = "2.0.0"
-druid = { git = "https://github.com/linebender/druid.git", features = ["im"], commit = "8d829c5" }
+druid = { git = "https://github.com/linebender/druid.git", features = ["im", "svg"], commit="8d829c5" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 uuid = { version = "0.8.1", features = ["serde", "v4"] }

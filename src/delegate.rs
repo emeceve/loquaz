@@ -1,4 +1,4 @@
-use std::{rc::Rc, str::FromStr, sync::Arc};
+use std::str::FromStr;
 
 use druid::{AppDelegate, ExtEventSink, Handled, Selector};
 use nostr::{util::nip04::decrypt, ClientMessage, Event};
@@ -9,7 +9,6 @@ use crate::{
     data::{
         app_state::AppState,
         state::{
-            config_state::ConfigState,
             contact_state::ContactState,
             conversation_state::{ChatMsgState, MsgState},
         },
