@@ -12,7 +12,6 @@ use uuid::Uuid;
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::{broker::BrokerEvent, core::config::Contact};
-use futures_channel::mpsc::UnboundedSender;
 
 use super::{
     router::Route,
@@ -29,7 +28,6 @@ use super::{
 pub struct AppState {
     pub chat_messages: Vector<String>,
     pub msg_to_send: String,
-    pub tx: Arc<Mutex<Option<UnboundedSender<Message>>>>,
     pub sender_broker: Arc<Option<tokio::sync::mpsc::Sender<BrokerEvent>>>,
     pub config: ConfigState,
     pub user: UserState,
@@ -53,7 +51,6 @@ impl AppState {
         Self {
             chat_messages: vector!(),
             msg_to_send: "".into(),
-            tx: Arc::new(Mutex::new(None)),
             sender_broker: Arc::new(None),
             new_contact_pk: "".into(),
             new_contact_alias: "".into(),

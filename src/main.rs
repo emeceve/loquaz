@@ -1,6 +1,5 @@
 mod delegate;
 mod view;
-mod ws_service;
 
 mod broker;
 mod components;
