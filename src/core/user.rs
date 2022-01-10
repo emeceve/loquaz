@@ -1,5 +1,6 @@
-use secp256k1::schnorrsig::PublicKey;
+use secp256k1::{schnorrsig::PublicKey, SecretKey};
 
+#[derive(Clone, Debug)]
 pub struct User {
     pub keys: nostr::Keys,
 }
@@ -23,5 +24,12 @@ impl User {
 
     pub fn get_pk(&self) -> PublicKey {
         self.keys.public_key.clone()
+    }
+
+    pub fn get_sk(&self) -> Option<SecretKey> {
+        match self.keys.secret_key() {
+            Ok(sk) => Some(sk),
+            Err(_) => None,
+        }
     }
 }

@@ -19,9 +19,9 @@ use super::{
     state::{
         config_state::ConfigState,
         contact_state::ContactState,
-        conversation_state::{ChatMsgState, ConversationState, MsgState},
+        conversation_state::{ConversationState, MessageState},
+        user_state::UserState,
     },
-    user::User,
 };
 
 // TODO: look into druid's Arcstr because we can use that for some of these
@@ -32,7 +32,7 @@ pub struct AppState {
     pub tx: Arc<Mutex<Option<UnboundedSender<Message>>>>,
     pub sender_broker: Arc<Option<tokio::sync::mpsc::Sender<BrokerEvent>>>,
     pub config: ConfigState,
-    pub user: User,
+    pub user: UserState,
     pub new_contact_alias: String,
     pub new_contact_pk: String,
     pub new_relay_ulr: String,
@@ -48,7 +48,7 @@ impl AppState {
         let config = ConfigState::new();
         let mut conversations = HashMap::new();
         for i in config.contacts.iter() {
-            conversations.insert(i.pk.clone(), ConversationState::new(i.clone()));
+            conversations.insert(i.pk.clone(), ConversationState::new(i.clone(), vec![]));
         }
         Self {
             chat_messages: vector!(),
@@ -63,7 +63,7 @@ impl AppState {
             selected_conv: None,
             sub_id: "".into(),
             config,
-            user: User::new("", ""),
+            user: UserState::new("", ""),
             route: Route::Settings,
         }
     }
@@ -84,7 +84,7 @@ impl AppState {
         id
     }
 
-    pub fn push_conv_msg(&mut self, msg: &MsgState, conversation_pk: &str) {
+    pub fn push_conv_msg(&mut self, msg: &MessageState, conversation_pk: &str) {
         match self.conversations.get_mut(conversation_pk) {
             Some(conv) => conv.push_msg(msg),
             None => println!("Conversation not found!"),
@@ -94,36 +94,49 @@ impl AppState {
         }
     }
 
-    pub fn push_new_msg(&mut self, new_msg: ChatMsgState) {
-        self.chat_messages.push_front(new_msg.content);
-    }
+    //    pub fn push_new_msg(&mut self, new_msg: ChatMsgState) {
+    //        self.chat_messages.push_front(new_msg.content);
+    //    }
 
     pub fn restore_sk(&mut self) {
-        let old_pk = self.user.pk.clone();
-        self.user.restore_keys_from_sk();
-        let pk = self.user.pk.clone();
+        //      let old_pk = self.user.pk.clone();
+        //      self.user.restore_keys_from_sk();
+        //      let pk = self.user.pk.clone();
 
-        if old_pk == pk {
-            eprintln!("that's the same pk bro")
-        } else {
-            let sender = (*self.sender_broker).clone();
-            tokio::spawn(async move {
-                sender
-                    .unwrap()
-                    .send(crate::broker::BrokerEvent::SubscribeInRelays { pk })
-                    .await;
-            });
-        }
-    }
+        //      if old_pk == pk {
+        //          eprintln!("that's the same pk bro")
+        //      } else {
+        //          let sender = (*self.sender_broker).clone();
+        //          tokio::spawn(async move {
+        //              sender
+        //                  .unwrap()
+        //                  .send(crate::broker::BrokerEvent::SubscribeInRelays { pk })
+        //                  .await;
+        //          });
+        //      }
+        //
+        //
+        //
+        //
 
-    pub fn generate_sk(&mut self) {
-        self.user.generate_keys_from_sk();
+        let sk = self.user.sk.clone();
         let sender = (*self.sender_broker).clone();
-        let pk = self.user.pk.clone();
         tokio::spawn(async move {
             sender
                 .unwrap()
-                .send(crate::broker::BrokerEvent::SubscribeInRelays { pk })
+                .send(crate::broker::BrokerEvent::RestoreKeyPair { sk })
+                .await;
+        });
+    }
+
+    pub fn generate_sk(&mut self) {
+        //     self.user.generate_keys_from_sk();
+        //     let pk = self.user.pk.clone();
+        let sender = (*self.sender_broker).clone();
+        tokio::spawn(async move {
+            sender
+                .unwrap()
+                .send(crate::broker::BrokerEvent::GenerateNewKeyPair)
                 .await;
         });
     }
@@ -143,14 +156,24 @@ impl AppState {
         //                self.selected_conv = Some(Rc::clone(conv));
         //            }
         //        }
-        match self.conversations.get_mut(pk) {
-            Some(conv) => {
-                self.selected_conv = Some(conv.clone());
-            }
-            None => println!("Conversation not found!"),
-        }
+        //    match self.conversations.get_mut(pk) {
+        //        Some(conv) => {
+        //            self.selected_conv = Some(conv.clone());
+        //        }
+        //        None => println!("Conversation not found!"),
+        //    }
 
-        println!("{:?}", self.selected_conv.as_ref().unwrap());
+        //    println!("{:?}", self.selected_conv.as_ref().unwrap());
+        //
+
+        let pk = pk.into();
+        let sender = (*self.sender_broker).clone();
+        tokio::spawn(async move {
+            sender
+                .unwrap()
+                .send(crate::broker::BrokerEvent::SetConversation { pk })
+                .await;
+        });
     }
 
     pub fn add_relay_url(&mut self) {

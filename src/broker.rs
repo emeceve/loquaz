@@ -4,11 +4,17 @@ use tokio::sync::mpsc;
 use crate::{
     core::{
         config::Contact,
+        conversations::ConvsNotifications,
         core::{CoreTaskHandle, CoreTaskHandleEvent},
     },
     data::{
         app_state::AppState,
-        state::{config_state::ConfigState, contact_state::ContactState},
+        state::{
+            config_state::ConfigState,
+            contact_state::ContactState,
+            conversation_state::{ConversationState, MessageState, NewMessage},
+            user_state::UserState,
+        },
     },
     delegate::BROKER_NOTI,
 };
@@ -21,6 +27,10 @@ pub enum BrokerEvent {
     AddContact { new_contact: Contact },
     RemoveContact { contact: Contact },
     SubscribeInRelays { pk: String },
+    RestoreKeyPair { sk: String },
+    GenerateNewKeyPair,
+    SetConversation { pk: String },
+    SendMessage { pk: String, content: String },
     LoadConfigs,
 }
 
@@ -34,6 +44,14 @@ pub async fn start_broker(
 ) {
     let mut core_handle = CoreTaskHandle::new();
 
+    //    let mut rec_ch = core_handle.get_noti_ch();
+    //
+    //    tokio::spawn(async move {
+    //        while let Ok(not) = rec_ch.recv().await {
+    //            println!("Received from broadcast {:?}", not);
+    //        }
+    //    });
+
     //Load configs
     send_res_ev_to_druid(
         &event_sink,
@@ -42,8 +60,49 @@ pub async fn start_broker(
         },
     );
 
+    let mut rec_convs_noti = core_handle.get_convs_notifications();
+    let ev_sink_clone = event_sink.clone();
+
+    tokio::spawn(async move {
+        while let Ok(noti) = rec_convs_noti.recv().await {
+            match noti {
+                ConvsNotifications::NewMessage(new_msg) => {
+                    ev_sink_clone.add_idle_callback(move |data: &mut AppState| {
+                        if data.selected_conv.is_some() {
+                            let mut updated_conv = data.selected_conv.clone().unwrap();
+                            updated_conv
+                                .messages
+                                .push_back(MessageState::from_entity(new_msg));
+                            data.selected_conv = Some(updated_conv);
+                        }
+                    });
+                }
+            }
+        }
+    });
+
     while let Some(broker_event) = broker_receiver.recv().await {
         match broker_event {
+            BrokerEvent::SendMessage { pk, content } => {
+                core_handle.send_msg_to_contact(&pk, &content).await;
+            }
+            BrokerEvent::SetConversation { pk } => {
+                if let Some(conv) = core_handle.get_conv(pk) {
+                    event_sink.add_idle_callback(move |data: &mut AppState| {
+                        data.selected_conv = Some(ConversationState::from_entity(conv));
+                    });
+                };
+            }
+            BrokerEvent::RestoreKeyPair { sk } => {
+                core_handle.import_user_sk(sk);
+                core_handle.subscribe().await;
+                update_user_state(&event_sink, &core_handle);
+            }
+            BrokerEvent::GenerateNewKeyPair => {
+                core_handle.gen_new_user_keypair();
+                core_handle.subscribe().await;
+                update_user_state(&event_sink, &core_handle);
+            }
             BrokerEvent::AddRelay { url } => {
                 if let CoreTaskHandleEvent::RelayAdded(Ok(_)) = core_handle.add_relay(url).await {
                     update_config_state(&event_sink, &core_handle).await;
@@ -64,7 +123,7 @@ pub async fn start_broker(
             }
 
             BrokerEvent::SubscribeInRelays { pk } => {
-                core_handle.subscribe(pk).await;
+                core_handle.subscribe().await;
             }
             BrokerEvent::AddContact { new_contact } => {
                 let res = core_handle.add_contact(new_contact).await;
@@ -91,6 +150,16 @@ fn load_config(core: &CoreTaskHandle) -> ConfigState {
         .collect();
 
     updated_config_state
+}
+
+fn update_user_state(event_sink: &ExtEventSink, core_handle: &CoreTaskHandle) {
+    let user = core_handle.get_user();
+    event_sink.add_idle_callback(move |data: &mut AppState| {
+        data.user = UserState::new(
+            &user.get_sk().unwrap().to_string(),
+            &user.get_pk().to_string(),
+        );
+    });
 }
 
 async fn update_config_state(event_sink: &ExtEventSink, core_handle: &CoreTaskHandle) {

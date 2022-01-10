@@ -9,7 +9,10 @@ use crate::{
         button::{button, danger_button},
         header::{header, jumbo_header},
     },
-    data::{app_state::AppState, state::config_state::ConfigState, user::User},
+    data::{
+        app_state::AppState,
+        state::{config_state::ConfigState, user_state::UserState},
+    },
     theme::MONO_FONT,
 };
 
@@ -37,7 +40,7 @@ fn secret_key() -> impl Widget<AppState> {
         .with_placeholder("Paste your private key here to restore")
         .with_font(MONO_FONT)
         .expand_width()
-        .lens(AppState::user.then(User::sk));
+        .lens(AppState::user.then(UserState::sk));
 
     let regenerate_button = danger_button("Generate New")
         .on_click(ConfigController::click_generate_sk)
@@ -104,7 +107,7 @@ fn pub_key() -> impl Widget<AppState> {
         .disabled_if(|_, _| true)
         .expand_width()
         // All this fancy shit is so we can pretty print pk
-        .lens(AppState::user.then(User::pk.map(
+        .lens(AppState::user.then(UserState::pk.map(
             |pk| {
                 if pk.len() > 0 {
                     pk.chars().enumerate().fold(String::new(), |acc, (i, c)| {

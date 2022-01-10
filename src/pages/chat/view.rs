@@ -1,7 +1,7 @@
 use druid::{
-    theme::WINDOW_BACKGROUND_COLOR,
-    widget::{CrossAxisAlignment, Flex, Label, List, Maybe, Painter, Scroll, TextBox},
-    Color, LensExt, RenderContext, UnitPoint, Widget, WidgetExt,
+    theme::{PRIMARY_DARK, PRIMARY_LIGHT, WINDOW_BACKGROUND_COLOR},
+    widget::{CrossAxisAlignment, Either, Flex, Label, List, Maybe, Painter, Scroll, TextBox},
+    Color, Env, LensExt, RenderContext, UnitPoint, Widget, WidgetExt,
 };
 
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
         state::{
             config_state::ConfigState,
             contact_state::ContactState,
-            conversation_state::{ConversationState, MsgState},
+            conversation_state::{ConversationState, MessageSourceState, MessageState},
         },
     },
     pages::chat::controller::ChatController,
@@ -61,15 +61,32 @@ pub fn chat_tab() -> impl Widget<AppState> {
     root.with_flex_child(lists, 1.0)
 }
 fn chat_conversation() -> impl Widget<ConversationState> {
-    Scroll::new(List::new(|| {
-        Label::new(|msg: &MsgState, _env: &_| format!("{}", msg.content))
-            .align_vertical(UnitPoint::LEFT)
-            .padding(10.0)
-            .expand()
-            .height(50.0)
-    }))
-    .vertical()
-    .lens(ConversationState::messages)
+    Scroll::new(List::new(|| chat_message()))
+        .vertical()
+        .lens(ConversationState::messages)
+}
+
+fn chat_message() -> impl Widget<MessageState> {
+    Either::new(
+        |data: &MessageState, env: &Env| data.source == MessageSourceState::Them,
+        {
+            let text = Label::raw()
+                .lens(MessageState::content)
+                .padding(10.)
+                .background(PRIMARY_DARK)
+                .rounded(10.);
+
+            Flex::row().with_child(text).with_flex_spacer(1.)
+        },
+        {
+            let text = Label::raw()
+                .lens(MessageState::content)
+                .padding(10.)
+                .background(PRIMARY_LIGHT)
+                .rounded(10.);
+            Flex::row().with_flex_spacer(1.).with_child(text)
+        },
+    )
 }
 
 fn chat_contact_item() -> impl Widget<ContactState> {

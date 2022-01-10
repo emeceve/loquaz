@@ -8,16 +8,13 @@ use crate::{
     broker::BrokerNotification,
     data::{
         app_state::AppState,
-        state::{
-            contact_state::ContactState,
-            conversation_state::{ChatMsgState, MsgState},
-        },
+        state::{contact_state::ContactState, conversation_state::NewMessage},
     },
 };
 
 pub const WS_RECEIVED_DATA: Selector<String> = Selector::new("nost_client.received_data");
 pub const CONNECT: Selector<ExtEventSink> = Selector::new("nostr_client.connect");
-pub const SEND_MSG: Selector<ChatMsgState> = Selector::new("nostr_client.send_msg");
+pub const SEND_MSG: Selector<NewMessage> = Selector::new("nostr_client.send_msg");
 pub const SEND_WS_MSG: Selector<String> = Selector::new("nostr_client.send_ws_msg");
 pub const REMOVE_CONTACT: Selector<ContactState> = Selector::new("nostr_client.delete_contact");
 pub const REMOVE_RELAY: Selector<String> = Selector::new("nostr_client.remove_relay");
@@ -64,29 +61,29 @@ impl AppDelegate<AppState> for Delegate {
                             &event.content,
                         ) {
                             Ok(decrypted_msg) => {
-                                let user_pk = &data.user.keys.clone().unwrap().public_key;
-                                let mut author: String = "".into();
-                                let mut conversation_pk: String = "".into();
-                                //If I am the author
-                                if event.pubkey == *user_pk {
-                                    event.tags.iter().for_each(|e| {
-                                        if e.kind() == "p" {
-                                            author = user_pk.to_string().clone();
-                                            conversation_pk = e.content().clone().to_string();
-                                        }
-                                    })
-                                } else {
-                                    author = event.pubkey.clone().to_string();
-                                    conversation_pk = event.pubkey.clone().to_string();
-                                }
-
-                                //Prevents the situations where "p" tag is missing
-                                if !author.is_empty() {
-                                    data.push_conv_msg(
-                                        &MsgState::new(&author, &decrypted_msg),
-                                        &conversation_pk,
-                                    );
-                                }
+                                //                                let user_pk = &data.user.keys.clone().unwrap().public_key;
+                                //                                let mut author: String = "".into();
+                                //                                let mut conversation_pk: String = "".into();
+                                //                                //If I am the author
+                                //                                if event.pubkey == *user_pk {
+                                //                                    event.tags.iter().for_each(|e| {
+                                //                                        if e.kind() == "p" {
+                                //                                            author = user_pk.to_string().clone();
+                                //                                            conversation_pk = e.content().clone().to_string();
+                                //                                        }
+                                //                                    })
+                                //                                } else {
+                                //                                    author = event.pubkey.clone().to_string();
+                                //                                    conversation_pk = event.pubkey.clone().to_string();
+                                //                                }
+                                //
+                                //                                //Prevents the situations where "p" tag is missing
+                                //                                if !author.is_empty() {
+                                //                                    data.push_conv_msg(
+                                //                                        &MsgState::new(&author, &decrypted_msg),
+                                //                                        &conversation_pk,
+                                //                                    );
+                                //                                }
                             }
                             Err(error) => eprintln!("{}", error),
                         };
@@ -122,16 +119,25 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else if let Some(msg) = cmd.get(SEND_MSG) {
             dbg!(&msg);
-            let dm = Event::new_encrypted_direct_msg(
-                // TODO is there a better way to deal with an Arc than all these as_refs?
-                data.user.keys.as_ref().unwrap().as_ref(),
-                &nostr::Keys::new_pub_only(&msg.receiver_pk).unwrap(),
-                &msg.content,
-            );
+            //    let dm = Event::new_encrypted_direct_msg(
+            //        // TODO is there a better way to deal with an Arc than all these as_refs?
+            //        //         data.user.keys.as_ref().unwrap().as_ref(),
+            //        &nostr::Keys::new_pub_only(&msg.receiver_pk).unwrap(),
+            //        &msg.content,
+            //    );
 
-            let ev = ClientMessage::new_event(dm.unwrap());
+            //    let ev = ClientMessage::new_event(dm.unwrap());
 
-            ctx.submit_command(SEND_WS_MSG.with(ev.to_json()));
+            //    ctx.submit_command(SEND_WS_MSG.with(ev.to_json()));
+            let sender = (*data.sender_broker).clone();
+            let pk = msg.pk.clone();
+            let content = msg.content.clone();
+            tokio::spawn(async move {
+                sender
+                    .unwrap()
+                    .send(crate::broker::BrokerEvent::SendMessage { pk, content })
+                    .await;
+            });
             Handled::Yes
         } else if let Some(msg) = cmd.get(SEND_WS_MSG) {
             println!("Message ws to be sent: {}", msg);
@@ -146,19 +152,19 @@ impl AppDelegate<AppState> for Delegate {
             //           }
             Handled::Yes
         } else if let Some(_) = cmd.get(CONNECTED_RELAY) {
-            println!("Connected to relay");
-
-            let authors = data.get_authors();
-            let id = data.gen_sub_id();
-            let req_sub = nostr::ClientMessage::new_req(
-                id,
-                vec![nostr::SubscriptionFilter::new()
-                    .authors(authors)
-                    .kind(nostr::Kind::EncryptedDirectMessage)
-                    .tag_p(data.user.keys.as_ref().unwrap().as_ref().public_key)],
-            );
-            println!("Sending subscription REQ");
-            ctx.submit_command(SEND_WS_MSG.with(req_sub.to_json()));
+            //            println!("Connected to relay");
+            //
+            //            let authors = data.get_authors();
+            //            let id = data.gen_sub_id();
+            //            let req_sub = nostr::ClientMessage::new_req(
+            //                id,
+            //                vec![nostr::SubscriptionFilter::new()
+            //                    .authors(authors)
+            //                    .kind(nostr::Kind::EncryptedDirectMessage)
+            //                    .pubkey(data.user.keys.as_ref().unwrap().as_ref().public_key)],
+            //            );
+            //            println!("Sending subscription REQ");
+            //ctx.submit_command(SEND_WS_MSG.with(req_sub.to_json()));
 
             Handled::Yes
         } else if let Some(contact_state) = cmd.get(REMOVE_CONTACT) {

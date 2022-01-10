@@ -3,54 +3,84 @@ use druid::{
     Data, Lens,
 };
 
+use crate::core::conversations::{Conversation, Message, MessageSource};
+
 use super::contact_state::ContactState;
 
 #[derive(Clone, Data, Lens, Debug)]
 pub struct ConversationState {
     pub contact: ContactState,
-    pub messages: Vector<MsgState>,
+    pub messages: Vector<MessageState>,
+    pub new_message: String,
 }
 
-// let conversation = HashMap<pk, Conversation>
-
 impl ConversationState {
-    pub fn new(contact: ContactState) -> Self {
+    pub fn new(contact: ContactState, messages: Vec<MessageState>) -> Self {
         Self {
             contact,
-            messages: vector![],
+            messages: Vector::from(messages),
+            new_message: "".into(),
         }
     }
 
-    pub fn push_msg(&mut self, msg: &MsgState) {
+    pub fn from_entity(conv: Conversation) -> Self {
+        Self {
+            contact: ContactState::new(&conv.contact.alias, &conv.contact.pk.to_string()),
+            messages: conv
+                .messages
+                .into_iter()
+                .map(|m| MessageState::from_entity(m))
+                .collect(),
+            new_message: "".into(),
+        }
+    }
+
+    pub fn push_msg(&mut self, msg: &MessageState) {
         self.messages.push_front(msg.clone());
     }
 }
 
 #[derive(Clone, Data, Lens, Debug)]
-pub struct MsgState {
-    pub source_pk: String,
+pub struct MessageState {
+    pub source: MessageSourceState,
     pub content: String,
 }
 
-impl MsgState {
-    pub fn new(source_pk: &str, content: &str) -> Self {
+impl MessageState {
+    pub fn new(source: MessageSourceState, content: &str) -> Self {
         Self {
-            source_pk: source_pk.into(),
+            source,
             content: content.into(),
+        }
+    }
+
+    pub fn from_entity(message: Message) -> Self {
+        Self {
+            source: match message.source {
+                MessageSource::Me => MessageSourceState::Me,
+                MessageSource::Them => MessageSourceState::Them,
+            },
+            content: message.content,
         }
     }
 }
 
+#[derive(Clone, Data, PartialEq, Debug)]
+pub enum MessageSourceState {
+    Me,
+    Them,
+}
+
 #[derive(Clone, Debug)]
-pub struct ChatMsgState {
-    pub receiver_pk: String,
+pub struct NewMessage {
+    pub pk: String,
     pub content: String,
 }
 
-impl ChatMsgState {
-    pub fn new(receiver_pk: &str, content: &str) -> Self {
+impl NewMessage {
+    pub fn new(pk: &str, content: &str) -> Self {
         Self {
-            receiver_pk: receiver_pk.into(),
+            pk: pk.into(),
             content: content.into(),
         }
     }
