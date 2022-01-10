@@ -12,7 +12,7 @@ use crate::{
         state::{
             config_state::ConfigState,
             contact_state::ContactState,
-            conversation_state::{ConversationState, MessageState, NewMessage},
+            conversation_state::{ConversationState, MessageState},
             user_state::UserState,
         },
     },
@@ -43,14 +43,6 @@ pub async fn start_broker(
     mut broker_receiver: mpsc::Receiver<BrokerEvent>,
 ) {
     let mut core_handle = CoreTaskHandle::new();
-
-    //    let mut rec_ch = core_handle.get_noti_ch();
-    //
-    //    tokio::spawn(async move {
-    //        while let Ok(not) = rec_ch.recv().await {
-    //            println!("Received from broadcast {:?}", not);
-    //        }
-    //    });
 
     //Load configs
     send_res_ev_to_druid(

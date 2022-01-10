@@ -40,10 +40,6 @@ pub fn chat_tab() -> impl Widget<AppState> {
 
     lists.add_flex_child(
         Flex::column()
-            .with_child(
-                Label::new(|contact: &ContactState, _env: &_| format!("{}", contact.alias))
-                    .lens(AppState::current_chat_contact),
-            )
             .with_flex_child(
                 Maybe::new(|| chat_conversation(), || Label::new("False"))
                     .lens(AppState::selected_conv),

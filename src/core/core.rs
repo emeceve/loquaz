@@ -119,26 +119,6 @@ impl CoreTaskHandle {
             dbg!("Error while creating event");
         }
 
-        //    if let Some(conv) = self.conversations.lock().unwrap().get_mut_conv(contact_pk) {
-        //        //Clone the value. If keep locked the function halt in new_encrypted_dm method...
-        //        let user_keys = self.user.lock().unwrap().keys.clone();
-        //        if let Ok(ev) = Event::new_encrypted_direct_msg(
-        //            &user_keys,
-        //            &nostr::Keys::new_pub_only(&conv.contact.pk.to_string()).unwrap(),
-        //            content,
-        //        ) {
-        //            conv.try_add_message_from_ev(&self.user.lock().unwrap(), ev.clone());
-        //            send_to_relays = true;
-        //            new_ev = Some(ev);
-        //        } else {
-        //            dbg!("Error while creating event");
-        //        }
-        //    } else {
-        //        dbg!("Conv not found");
-        //    };
-
-        println!("{:?} {:?}", new_ev, send_to_relays);
-
         //This is necessary because we cant send a mutex to another thread
         //and Tokio runtime can move this task between threads at every .await
         //https://tokio.rs/tokio/tutorial/shared-state

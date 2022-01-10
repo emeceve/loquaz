@@ -10,9 +10,6 @@ use druid::{
 };
 
 pub fn root_ui() -> impl Widget<AppState> {
-    // Tabs::new()
-    // .with_tab("Chat", chat_tab())
-    // .with_tab("Config", config_tab())
     Flex::row().with_child(nav()).with_flex_child(
         ViewSwitcher::new(
             |data: &AppState, _| data.route,
