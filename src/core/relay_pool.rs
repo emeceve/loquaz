@@ -31,7 +31,7 @@ impl RelayPoolTask {
     async fn handle_message(&mut self, msg: RelayPoolEv) {
         match msg {
             RelayPoolEv::ReceivedMsg { relay_url, msg } => {
-                dbg!("Received message from {}: {:?}", &relay_url, &msg);
+                dbg!(format!("Received message from {}: {:?}", &relay_url, &msg));
                 match msg {
                     RelayMessage::Event {
                         event,
