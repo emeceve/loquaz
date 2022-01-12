@@ -1,4 +1,4 @@
-# nostr-chat
+# Loquaz
 A simple desktop app for encrypted direct messages on Nostr protocol
 
 # Build steps
