@@ -19,20 +19,25 @@ use crate::{
 use super::controller::ConfigController;
 
 pub fn config_tab() -> impl Widget<AppState> {
-    let root = Flex::column()
-        .main_axis_alignment(MainAxisAlignment::Start)
-        .cross_axis_alignment(CrossAxisAlignment::Start);
+    let root = Flex::column().main_axis_alignment(MainAxisAlignment::Start);
 
-    root.with_child(jumbo_header("Settings"))
-        .with_spacer(20.)
-        .with_child(relays_list())
-        .with_child(relay_config())
-        .with_spacer(20.)
-        .with_child(pub_key())
-        .with_spacer(20.)
-        .with_child(secret_key())
-        .with_flex_spacer(1.0)
-        .padding(10.)
+    root.with_flex_child(
+        Scroll::new(
+            Flex::column()
+                .cross_axis_alignment(CrossAxisAlignment::Start)
+                .with_child(jumbo_header("Settings"))
+                .with_spacer(20.)
+                .with_child(relays_list())
+                .with_child(relay_config())
+                .with_spacer(20.)
+                .with_child(pub_key())
+                .with_spacer(20.)
+                .with_child(secret_key())
+                .padding(10.),
+        )
+        .vertical(),
+        1.,
+    )
 }
 
 fn secret_key() -> impl Widget<AppState> {
