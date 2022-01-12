@@ -33,3 +33,6 @@ build and run
 ```
 cargo run
 ```
+# Design concept
+
+Our aim is to achieve [this](https://www.figma.com/file/QAskQ78LGBKXQEEDIPsXbe/chat-app?node-id=0%3A1) design made by [@futurepaul](https://github.com/futurepaul)
