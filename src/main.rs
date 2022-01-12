@@ -24,8 +24,8 @@ async fn main() {
         .title("Nostr Chat")
         // .menu(menus::make_menu)
         .menu(menus::make_menu)
-        .window_size((480., 480.))
-        .with_min_size((480., 480.));
+        .window_size((640., 580.))
+        .with_min_size((600., 600.));
     let laucher = AppLauncher::with_window(main_window).delegate(Delegate {});
 
     //Init state

@@ -5,7 +5,7 @@ use druid::{
 };
 
 use crate::{
-    components::button::button,
+    components::{button::button, header::header},
     data::{
         app_state::AppState,
         state::{
@@ -15,6 +15,7 @@ use crate::{
         },
     },
     pages::chat::controller::ChatController,
+    theme::MONO_FONT,
 };
 
 pub fn chat_tab() -> impl Widget<AppState> {
@@ -22,44 +23,60 @@ pub fn chat_tab() -> impl Widget<AppState> {
 
     let mut lists = Flex::row().cross_axis_alignment(CrossAxisAlignment::Start);
 
-    lists.add_flex_child(
+    lists.add_child(
         Scroll::new(
             List::new(chat_contact_item).lens(AppState::config.then(ConfigState::contacts)),
         )
-        .vertical(),
-        1.0,
+        .vertical()
+        .fix_width(200.),
     );
-
-    let msg_text_box = TextBox::new()
-        .with_placeholder("Say hello")
-        .expand_width()
-        .lens(AppState::msg_to_send);
-
     // let send_btn = Button::new("Send").on_click(ChatController::click_send_msg);
-    let send_btn = button("SEND").on_click(ChatController::click_send_msg);
 
     lists.add_flex_child(
         Flex::column()
             .with_flex_child(
-                Maybe::new(|| chat_conversation(), || Label::new("False"))
-                    .lens(AppState::selected_conv),
-                3.0,
+                Maybe::new(
+                    || chat_conversation(),
+                    || {
+                        Flex::column()
+                            .with_child(header("<-- Select A Conversation").padding(10.))
+                            .with_flex_spacer(1.)
+                    },
+                )
+                .lens(AppState::selected_conv),
+                1.,
             )
-            .with_child(
-                Flex::row()
-                    .with_flex_child(msg_text_box, 1.0)
-                    .with_child(send_btn)
-                    .padding(10.0),
-            ),
+            .with_child(input()),
         2.0,
     );
 
     root.with_flex_child(lists, 1.0)
 }
+
+fn input() -> impl Widget<AppState> {
+    let msg_text_box = TextBox::multiline()
+        .with_font(MONO_FONT)
+        .with_placeholder("Say hello")
+        .expand_width()
+        .lens(AppState::msg_to_send);
+
+    let send_btn = button("SEND").on_click(ChatController::click_send_msg);
+
+    Flex::row()
+        .cross_axis_alignment(CrossAxisAlignment::End)
+        .with_flex_child(msg_text_box, 1.0)
+        .with_child(send_btn)
+        .padding(10.)
+}
 fn chat_conversation() -> impl Widget<ConversationState> {
-    Scroll::new(List::new(|| chat_message()))
-        .vertical()
-        .lens(ConversationState::messages)
+    Scroll::new(
+        Flex::row()
+            .with_flex_spacer(1.)
+            .with_child(List::new(|| chat_message().fix_width(350.)).padding(10.))
+            .with_flex_spacer(1.),
+    )
+    .vertical()
+    .lens(ConversationState::messages)
 }
 
 fn chat_message() -> impl Widget<MessageState> {
@@ -67,20 +84,28 @@ fn chat_message() -> impl Widget<MessageState> {
         |data: &MessageState, env: &Env| data.source == MessageSourceState::Them,
         {
             let text = Label::raw()
+                .with_line_break_mode(druid::widget::LineBreaking::WordWrap)
                 .lens(MessageState::content)
                 .padding(10.)
                 .background(PRIMARY_DARK)
                 .rounded(10.);
 
-            Flex::row().with_child(text).with_flex_spacer(1.)
+            Flex::row()
+                .main_axis_alignment(druid::widget::MainAxisAlignment::Start)
+                .with_flex_child(text, 5.)
+                .with_flex_spacer(1.)
         },
         {
             let text = Label::raw()
+                .with_line_break_mode(druid::widget::LineBreaking::WordWrap)
                 .lens(MessageState::content)
                 .padding(10.)
                 .background(PRIMARY_LIGHT)
                 .rounded(10.);
-            Flex::row().with_flex_spacer(1.).with_child(text)
+            Flex::row()
+                .main_axis_alignment(druid::widget::MainAxisAlignment::End)
+                .with_flex_spacer(1.)
+                .with_flex_child(text, 5.)
         },
     )
 }
@@ -102,6 +127,7 @@ fn chat_contact_item() -> impl Widget<ContactState> {
     });
 
     Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(Label::raw().lens(ContactState::alias))
         .with_child(
             Label::new(|pk: &String, _env: &_| {
