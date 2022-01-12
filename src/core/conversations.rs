@@ -1,7 +1,9 @@
 use std::{collections::HashMap, str::FromStr};
 
 use super::{config::Contact, user::User};
+use chrono::Duration;
 use nostr::{util::nip04::decrypt, Event};
+use notify_rust::Notification;
 use secp256k1::schnorrsig::PublicKey;
 use thiserror::Error;
 use tokio::sync::broadcast;
@@ -68,7 +70,9 @@ impl Conversations {
                 match decrypt(&sk, &peer_pk, &ev.content) {
                     Ok(decrypted_msg) => {
                         let new_msg = Message::new(source, &decrypted_msg, ev);
+
                         conv.add_message(new_msg.clone());
+
                         //Send notification to listeners
                         self.conv_noti_sender
                             .send(ConvsNotifications::NewMessage(new_msg));
@@ -124,6 +128,22 @@ impl Conversation {
     }
 
     fn add_message(&mut self, message: Message) {
+        // If the message is from Them, and is less than one minute old, show an OS notification
+        let current_time = chrono::offset::Utc::now();
+
+        if message.ev.created_at > current_time - Duration::seconds(60) {
+            if message.source == MessageSource::Them {
+                if Notification::new()
+                    .summary(&self.contact.alias)
+                    .body(&message.content)
+                    .show()
+                    .is_err()
+                {
+                    eprintln!("Couldn't show OS notification")
+                }
+            }
+        }
+
         self.messages.push(message);
         self.messages
             .sort_by(|a, b| a.ev.created_at.cmp(&b.ev.created_at));
@@ -147,7 +167,7 @@ impl Message {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MessageSource {
     Me,
     Them,
