@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use futures::{SinkExt, StreamExt};
-use nostr::{self, ClientMessage, Event, RelayMessage, SubscriptionFilter};
+use nostr::{self, ClientMessage, Event, Keys, RelayMessage, SubscriptionFilter};
 use tokio::sync::{
     broadcast,
     mpsc::{self, Receiver, Sender},
 };
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
-use super::subscription::Subscription;
+use super::{config::Contact, subscription::Subscription};
 
 pub struct RelayPoolTask {
     receiver: Receiver<RelayPoolEv>,
@@ -52,6 +52,12 @@ impl RelayPoolTask {
             }
             RelayPoolEv::EventSent { ev } => {
                 self.events.insert(ev.id.to_string(), ev.clone());
+            }
+            RelayPoolEv::RemoveContactEvents(contact_keys) => {
+                self.events.retain(|_, v| {
+                    v.pubkey != contact_keys.public_key
+                        && v.tags[0].content() != contact_keys.public_key.to_string()
+                });
             }
 
             _ => (),
@@ -99,6 +105,13 @@ impl RelayPool {
 
     pub fn list_relays(&self) -> Vec<Relay> {
         self.relays.iter().map(|(k, v)| v.to_owned()).collect()
+    }
+    pub async fn remove_contact_events(&self, contact: Contact) {
+        //TODO: Remove this convertion when change contact pk to Keys type
+        let c_keys = Keys::new_pub_only(&contact.pk.to_string()).unwrap();
+        self.pool_task_sender
+            .send(RelayPoolEv::RemoveContactEvents(c_keys))
+            .await;
     }
     pub async fn send_ev(&self, ev: Event) {
         //Send to pool task to save in all received events
@@ -286,6 +299,7 @@ pub enum RelayPoolEv {
         relay_url: String,
         msg: nostr::RelayMessage,
     },
+    RemoveContactEvents(Keys),
     EventSent {
         ev: Event,
     },

@@ -187,11 +187,25 @@ impl CoreTaskHandle {
         self.relay_pool.start_sub(filters).await;
     }
     pub async fn add_contact(&mut self, contact: Contact) {
-        self.config.add_contact(contact);
+        self.config.add_contact(contact.clone());
+        self.conversations
+            .lock()
+            .unwrap()
+            .add_conv(Conversation::new(contact));
+        //Update filters and resubscribe based on updated conversations
+        self.subscribe().await;
     }
 
     pub async fn remove_contact(&mut self, contact: Contact) {
-        self.config.remove_contact(contact);
+        self.config.remove_contact(contact.clone());
+        self.conversations
+            .lock()
+            .unwrap()
+            .remove_conv(&contact.pk.to_string());
+
+        self.relay_pool.remove_contact_events(contact).await;
+        //Update filters and resubscribe based on updated conversations
+        self.subscribe().await;
     }
 
     pub fn get_config(&self) -> (Vec<String>, Vec<Contact>) {
