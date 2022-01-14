@@ -1,4 +1,8 @@
-use druid::{Env, EventCtx};
+use druid::{
+    keyboard_types::Key,
+    widget::{Controller, TextBox},
+    Env, Event, EventCtx, Widget,
+};
 
 use crate::{
     data::{
@@ -27,5 +31,41 @@ impl ChatController {
     }
     pub fn click_select_conv(ctx: &mut EventCtx, data: &mut ContactState, _env: &Env) {
         ctx.submit_command(SELECT_CONV.with(data.pk.clone()));
+    }
+}
+
+pub struct OnEnterController;
+
+impl<W: Widget<AppState>> Controller<AppState, W> for OnEnterController {
+    fn event(
+        &mut self,
+        child: &mut W,
+        ctx: &mut EventCtx,
+        event: &Event,
+        data: &mut AppState,
+        env: &Env,
+    ) {
+        match event {
+            Event::KeyUp(k_e) => {
+                if k_e.key == Key::Enter {
+                    if data.selected_conv.is_some() {
+                        let pk = data.selected_conv.clone().unwrap().contact.pk;
+                        let content = data.msg_to_send.clone();
+                        let trimmed = content.trim_end();
+                        //TODO: Use chat new message instead
+                        // let content = data.selected_conv.unwrap().new_message;
+                        ctx.submit_command(SEND_MSG.with(NewMessage::new(&pk, &trimmed)));
+
+                        data.msg_to_send = "".into();
+                    }
+                    ctx.set_handled()
+                }
+            }
+            _ => {}
+        }
+
+        if (!ctx.is_handled()) {
+            child.event(ctx, event, data, env);
+        }
     }
 }

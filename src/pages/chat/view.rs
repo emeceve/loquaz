@@ -18,6 +18,8 @@ use crate::{
     theme::MONO_FONT,
 };
 
+use super::controller::OnEnterController;
+
 pub fn chat_tab() -> impl Widget<AppState> {
     let root = Flex::column();
 
@@ -58,7 +60,8 @@ fn input() -> impl Widget<AppState> {
         .with_font(MONO_FONT)
         .with_placeholder("Say hello")
         .expand_width()
-        .lens(AppState::msg_to_send);
+        .lens(AppState::msg_to_send)
+        .controller(OnEnterController);
 
     let send_btn = button("SEND").on_click(ChatController::click_send_msg);
 
