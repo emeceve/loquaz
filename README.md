@@ -20,13 +20,13 @@ apt install libgtk-3-dev
 ## 3. Clone 
 
 ```
-git clone  https://github.com/emeceve/nostr-chat.git 
+git clone  https://github.com/emeceve/loquaz.git 
 ```
 ## 4. Build and run!!
 
 Change directory
  ```
-cd nostr-chat
+cd loquaz
 ```
 build and run
 
