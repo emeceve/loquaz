@@ -31,6 +31,7 @@ impl RelayPoolTask {
     async fn handle_message(&mut self, msg: RelayPoolEv) {
         match msg {
             RelayPoolEv::ReceivedMsg { relay_url, msg } => {
+                // TODO: set up optional logging
                 dbg!(format!("Received message from {}: {:?}", &relay_url, &msg));
                 match msg {
                     RelayMessage::Event {
@@ -41,6 +42,7 @@ impl RelayPoolTask {
                         if let Ok(_) = event.verify() {
                             //Adds only new events
                             if let None = self.events.insert(event.id.to_string(), event.clone()) {
+                                // TODO: set up optional logging
                                 dbg!("New event, propagates");
                                 self.notification_sender
                                     .send(RelayPoolNotifications::ReceivedEvent { ev: event });
