@@ -35,8 +35,11 @@ pub enum BrokerEvent {
     },
     RestoreKeyPair {
         sk: String,
+        resp: Responder<Result<String, String>>,
     },
-    GenerateNewKeyPair,
+    GenerateNewKeyPair {
+        resp: Responder<Result<(String, String), String>>,
+    },
     SetConversation {
         pk: String,
     },
@@ -91,7 +94,6 @@ pub async fn start_broker(
     //  });
 
     while let Some(broker_event) = broker_receiver.recv().await {
-        println!("New event");
         match broker_event {
             BrokerEvent::SendMessage { pk, content } => {
                 core_handle.send_msg_to_contact(&pk, &content).await;
@@ -103,15 +105,19 @@ pub async fn start_broker(
                     //    });
                 };
             }
-            BrokerEvent::RestoreKeyPair { sk } => {
+            BrokerEvent::RestoreKeyPair { sk, resp } => {
                 core_handle.import_user_sk(sk);
-                core_handle.subscribe().await;
-                // update_user_state(&event_sink, &core_handle);
+                resp.send(Ok(core_handle.get_user().get_pk().to_string()));
+                //                core_handle.su)b)scribe().await;
             }
-            BrokerEvent::GenerateNewKeyPair => {
+            BrokerEvent::GenerateNewKeyPair { resp } => {
                 core_handle.gen_new_user_keypair();
-                core_handle.subscribe().await;
-                //  update_user_state(&event_sink, &core_handle);
+                let user = core_handle.get_user();
+                resp.send(Ok((
+                    user.get_sk().unwrap().to_string(),
+                    user.get_pk().to_string(),
+                )));
+                // core_handle.subscribe().await;
             }
             BrokerEvent::AddRelay { url, resp } => {
                 if let CoreTaskHandleEvent::RelayAdded(Ok(_)) = core_handle.add_relay(url).await {

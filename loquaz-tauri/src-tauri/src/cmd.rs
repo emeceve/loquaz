@@ -19,6 +19,32 @@ pub async fn get_config(
 }
 
 #[command]
+pub async fn restore_key_pair(
+    sk: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let (res_tx, res_rx) = oneshot::channel();
+    state
+        .core_command_sender
+        .send(BrokerEvent::RestoreKeyPair { sk, resp: res_tx })
+        .await;
+
+    res_rx.await.map_err(|err| format!("{}", err)).unwrap()
+}
+#[command]
+pub async fn generate_key_pair(
+    state: tauri::State<'_, AppState>,
+) -> Result<(String, String), String> {
+    let (res_tx, res_rx) = oneshot::channel();
+    state
+        .core_command_sender
+        .send(BrokerEvent::GenerateNewKeyPair { resp: res_tx })
+        .await;
+
+    res_rx.await.map_err(|err| format!("{}", err)).unwrap()
+}
+
+#[command]
 pub async fn add_contact(
     alias: String,
     pk: String,

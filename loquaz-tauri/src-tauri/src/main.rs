@@ -13,7 +13,10 @@ mod core;
 
 use broker::{start_broker, BrokerEvent};
 
-use crate::cmd::{add_contact, add_relay, get_config, remove_contact, remove_relay};
+use crate::cmd::{
+    add_contact, add_relay, generate_key_pair, get_config, remove_contact, remove_relay,
+    restore_key_pair,
+};
 
 use tokio::sync::mpsc;
 pub struct AppState {
@@ -44,10 +47,12 @@ async fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             get_config,
+            restore_key_pair,
             add_contact,
             add_relay,
             remove_relay,
-            remove_contact
+            remove_contact,
+            generate_key_pair
         ])
         .run(tauri::generate_context!("tauri.conf.json"))
         .expect("error while running tauri application");
