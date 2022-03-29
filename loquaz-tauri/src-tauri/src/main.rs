@@ -7,63 +7,48 @@
     windows_subsystem = "windows"
 )]
 
-use tauri::{CustomMenuItem, Menu, MenuItem, Submenu};
+mod broker;
+mod cmd;
+mod core;
 
-#[tauri::command]
-fn message(value: String) -> String {
-    format!("got: {}", value)
+use broker::{start_broker, BrokerEvent};
+
+use crate::cmd::{add_contact, add_relay, get_config, remove_contact, remove_relay};
+
+use tokio::sync::mpsc;
+pub struct AppState {
+    pub core_command_sender: mpsc::Sender<BrokerEvent>,
 }
 
-fn main() {
-    let about_menu = Submenu::new(
-        "App",
-        Menu::new()
-            .add_native_item(MenuItem::Hide)
-            .add_native_item(MenuItem::HideOthers)
-            .add_native_item(MenuItem::ShowAll)
-            .add_native_item(MenuItem::Separator)
-            .add_native_item(MenuItem::Quit),
-    );
+use tauri::Manager;
 
-    let edit_menu = Submenu::new(
-        "Edit",
-        Menu::new()
-            .add_native_item(MenuItem::Undo)
-            .add_native_item(MenuItem::Redo)
-            .add_native_item(MenuItem::Separator)
-            .add_native_item(MenuItem::Cut)
-            .add_native_item(MenuItem::Copy)
-            .add_native_item(MenuItem::Paste)
-            .add_native_item(MenuItem::SelectAll),
-    );
-
-    let view_menu = Submenu::new(
-        "View",
-        Menu::new().add_native_item(MenuItem::EnterFullScreen),
-    );
-
-    let window_menu = Submenu::new(
-        "Window",
-        Menu::new()
-            .add_native_item(MenuItem::Minimize)
-            .add_native_item(MenuItem::Zoom),
-    );
-
-    let help_menu = Submenu::new(
-        "Help",
-        Menu::new().add_item(CustomMenuItem::new("Learn More", "Learn More")),
-    );
-
-    let menu = Menu::new()
-        .add_submenu(about_menu)
-        .add_submenu(edit_menu)
-        .add_submenu(view_menu)
-        .add_submenu(window_menu)
-        .add_submenu(help_menu);
-
+#[tokio::main]
+async fn main() {
     tauri::Builder::default()
-        .menu(menu)
-        .invoke_handler(tauri::generate_handler![message])
+        .setup(|app| {
+            let main_window = app.get_window("main").unwrap();
+            println!("Initing process");
+            //           tauri::async_runtime::spawn(async move {
+            //    start_broker(main_window);
+            //  main_window.emit("test-event", "Test").unwrap();
+            //            });
+            let (sender, receiver) = mpsc::channel::<BrokerEvent>(64);
+
+            tokio::spawn(start_broker(receiver));
+
+            let app_handle = app.handle();
+            app_handle.manage(AppState {
+                core_command_sender: sender,
+            });
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            get_config,
+            add_contact,
+            add_relay,
+            remove_relay,
+            remove_contact
+        ])
         .run(tauri::generate_context!("tauri.conf.json"))
         .expect("error while running tauri application");
 }

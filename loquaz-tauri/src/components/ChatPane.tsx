@@ -1,6 +1,7 @@
 import Button from "./Button";
 import React, { FormEvent, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
+import {listen} from "@tauri-apps/api/event";
 
 export default function ChatPane() {
   const [messageInput, setMessageInput] = useState("");
@@ -19,7 +20,7 @@ export default function ChatPane() {
       const response = await invoke("message", {
         value: messageInput,
       });
-      console.debug("response ", response);
+      console.debug("response addsfdsf ", response);
       updateResponse(response);
       setMessageInput("");
     } catch (error) {
@@ -53,7 +54,7 @@ export default function ChatPane() {
           placeholder="Say something nice"
           onChange={(e) => setMessageInput(e.target.value)}
         />
-        <Button submit>Send</Button>
+        <Button submit>Send bla</Button>
       </form>
     </div>
   );
