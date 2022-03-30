@@ -12,6 +12,7 @@ mod cmd;
 mod core;
 
 use broker::{start_broker, BrokerEvent};
+use log::{debug, info};
 
 use crate::cmd::{
     add_contact, add_relay, generate_key_pair, get_config, remove_contact, remove_relay,
@@ -27,10 +28,12 @@ use tauri::Manager;
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+
+    info!("Initializing tauri app");
     tauri::Builder::default()
         .setup(|app| {
             let main_window = app.get_window("main").unwrap();
-            println!("Initing process");
             //           tauri::async_runtime::spawn(async move {
             //    start_broker(main_window);
             //  main_window.emit("test-event", "Test").unwrap();
@@ -43,6 +46,8 @@ async fn main() {
             app_handle.manage(AppState {
                 core_command_sender: sender,
             });
+            info!("Core broker spawned");
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

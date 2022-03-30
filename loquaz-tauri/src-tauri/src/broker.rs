@@ -1,3 +1,4 @@
+use log::info;
 use tauri::Wry;
 use tokio::sync::{mpsc, oneshot};
 
@@ -64,14 +65,6 @@ pub async fn start_broker(
 ) {
     let mut core_handle = CoreTaskHandle::new();
 
-    //Load configs
-    //  send_res_ev_to_druid(
-    //      &event_sink,
-    //      BrokerNotification::ConfigUpdated {
-    //          config: load_config(&core_handle),
-    //      },
-    //  );
-
     let mut rec_convs_noti = core_handle.get_convs_notifications();
     //  let ev_sink_clone = event_sink.clone();
 
@@ -93,6 +86,7 @@ pub async fn start_broker(
     //      }
     //  });
 
+    info!("Broker initialized and waiting for commands");
     while let Some(broker_event) = broker_receiver.recv().await {
         match broker_event {
             BrokerEvent::SendMessage { pk, content } => {
@@ -108,7 +102,8 @@ pub async fn start_broker(
             BrokerEvent::RestoreKeyPair { sk, resp } => {
                 core_handle.import_user_sk(sk);
                 resp.send(Ok(core_handle.get_user().get_pk().to_string()));
-                //                core_handle.su)b)scribe().await;
+
+                core_handle.subscribe().await;
             }
             BrokerEvent::GenerateNewKeyPair { resp } => {
                 core_handle.gen_new_user_keypair();

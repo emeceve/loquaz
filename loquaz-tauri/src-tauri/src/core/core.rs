@@ -4,9 +4,13 @@ use super::{
     relay_pool::{RelayPool, RelayPoolNotifications},
     user::User,
 };
+use log::debug;
 use nostr::Event;
 use secp256k1::schnorrsig::PublicKey;
-use std::sync::{Arc, Mutex};
+use std::{
+    fmt::Debug,
+    sync::{Arc, Mutex},
+};
 use thiserror::Error;
 use tokio::sync::broadcast;
 
@@ -63,7 +67,7 @@ impl CoreTaskHandle {
         let user_clone = user.clone();
         tokio::spawn(async move {
             while let Ok(noti) = rec_ch.recv().await {
-                println!("Received from broadcast {:?}", noti);
+                debug!("Received from broadcast {:?}", noti);
                 match noti {
                     RelayPoolNotifications::ReceivedEvent { ev } => {
                         conversations_clone

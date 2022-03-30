@@ -2,6 +2,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use super::{config::Contact, user::User};
 use chrono::Duration;
+use log::error;
 use nostr::{util::nip04::decrypt, Event};
 use secp256k1::schnorrsig::PublicKey;
 use thiserror::Error;
@@ -78,7 +79,7 @@ impl Conversations {
                         Ok(())
                     }
                     Err(e) => {
-                        eprintln!("{}", e);
+                        error!("{}", e);
                         Err(ConversationsError::AddMessageFailed)
                     }
                 }

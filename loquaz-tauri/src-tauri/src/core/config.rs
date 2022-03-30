@@ -1,3 +1,4 @@
+use log::{info, warn};
 use secp256k1::schnorrsig::PublicKey;
 use serde::{Deserialize, Serialize};
 
@@ -71,6 +72,7 @@ impl ConfigProvider {
 
     pub fn load() -> Self {
         let mut dir = Self::get_path();
+        info!("Loading configs from file {}", dir.display());
         fs::create_dir_all(&dir);
         let file = File::open(&Self::get_config_path());
 
@@ -110,14 +112,10 @@ impl ConfigProvider {
                 let mut nostr_dir_path = PathBuf::new();
                 nostr_dir_path.push(path);
                 nostr_dir_path.push(NOSTR_DIR_NAME);
-                println!(
-                    "Using the following directory: {}",
-                    nostr_dir_path.display(),
-                );
                 nostr_dir_path
             }
             None => {
-                println!("Impossible to get your home dir");
+                warn!("Impossible to get your home dir");
                 let mut local_dir = PathBuf::new();
                 local_dir.push(NOSTR_DIR_NAME);
                 local_dir
