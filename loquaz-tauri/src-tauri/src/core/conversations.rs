@@ -5,6 +5,7 @@ use chrono::Duration;
 use log::error;
 use nostr::{util::nip04::decrypt, Event};
 use secp256k1::schnorrsig::PublicKey;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::broadcast;
 
@@ -113,7 +114,7 @@ impl Conversations {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Conversation {
     pub contact: Contact,
     pub messages: Vec<Message>,
@@ -150,7 +151,7 @@ impl Conversation {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message {
     pub source: MessageSource,
     pub content: String,
@@ -167,7 +168,7 @@ impl Message {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum MessageSource {
     Me,
     Them,

@@ -164,6 +164,11 @@ impl RelayPool {
         }
     }
 
+    pub async fn connect_all(&mut self) {
+        for (relay_url, _) in self.relays.clone().iter() {
+            self.connect_relay(relay_url).await
+        }
+    }
     pub async fn connect_relay(&mut self, url: &str) {
         self.relays
             .get_mut::<String>(&String::from(url))

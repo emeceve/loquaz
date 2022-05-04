@@ -150,7 +150,9 @@ impl CoreTaskHandle {
             .map_err(|_| CoreTaskHandleError::AddRelayFailed);
         CoreTaskHandleEvent::RemovedRelay(Ok(()))
     }
-
+    pub async fn connect_all_relays(&mut self) {
+        self.relay_pool.connect_all().await;
+    }
     pub async fn connect_relay(&mut self, url: String) {
         self.relay_pool.connect_relay(&url).await;
     }

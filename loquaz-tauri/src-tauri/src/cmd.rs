@@ -1,6 +1,10 @@
 use std::str::FromStr;
 
-use crate::{broker::BrokerEvent, core::config::Contact, AppState};
+use crate::{
+    broker::BrokerEvent,
+    core::{config::Contact, conversations::Conversation},
+    AppState,
+};
 use log::debug;
 use secp256k1::schnorrsig::PublicKey;
 use tauri::command;
@@ -21,10 +25,25 @@ pub async fn get_config(
 }
 
 #[command]
+pub async fn get_conversation(
+    pk: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<Conversation, String> {
+    debug!("get_conversation command called");
+    let (res_tx, res_rx) = oneshot::channel();
+    state
+        .core_command_sender
+        .send(BrokerEvent::GetConversation { pk, resp: res_tx })
+        .await;
+
+    res_rx.await.map_err(|err| format!("{}", err)).unwrap()
+}
+
+#[command]
 pub async fn restore_key_pair(
     sk: String,
     state: tauri::State<'_, AppState>,
-) -> Result<String, String> {
+) -> Result<(String, String), String> {
     debug!("restore_key_pair command called");
     let (res_tx, res_rx) = oneshot::channel();
     state

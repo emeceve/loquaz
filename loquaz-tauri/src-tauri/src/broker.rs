@@ -1,10 +1,10 @@
-use log::info;
+use log::{debug, info};
 use tauri::Wry;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::core::{
     config::Contact,
-    conversations::ConvsNotifications,
+    conversations::{Conversation, ConvsNotifications},
     core::{CoreTaskHandle, CoreTaskHandleEvent},
 };
 
@@ -36,13 +36,17 @@ pub enum BrokerEvent {
     },
     RestoreKeyPair {
         sk: String,
-        resp: Responder<Result<String, String>>,
+        resp: Responder<Result<(String, String), String>>,
     },
     GenerateNewKeyPair {
         resp: Responder<Result<(String, String), String>>,
     },
     SetConversation {
         pk: String,
+    },
+    GetConversation {
+        pk: String,
+        resp: Responder<Result<Conversation, String>>,
     },
     SendMessage {
         pk: String,
@@ -68,24 +72,28 @@ pub async fn start_broker(
     let mut rec_convs_noti = core_handle.get_convs_notifications();
     //  let ev_sink_clone = event_sink.clone();
 
-    //  tokio::spawn(async move {
-    //      while let Ok(noti) = rec_convs_noti.recv().await {
-    //          match noti {
-    //              ConvsNotifications::NewMessage(new_msg) => {
-    //                  ev_sink_clone.add_idle_callback(move |data: &mut AppState| {
-    //                      if data.selected_conv.is_some() {
-    //                          let mut updated_conv = data.selected_conv.clone().unwrap();
-    //                          updated_conv
-    //                              .messages
-    //                              .push_back(MessageState::from_entity(new_msg));
-    //                          data.selected_conv = Some(updated_conv);
-    //                      }
-    //                  });
-    //              }
-    //          }
-    //      }
-    //  });
+    tokio::spawn(async move {
+        while let Ok(noti) = rec_convs_noti.recv().await {
+            match noti {
+                ConvsNotifications::NewMessage(new_msg) => {
+                    debug!("{:?}", new_msg);
 
+                    //    ev_sink_clone.add_idle_callback(move |data: &mut AppState| {
+                    //        if data.selected_conv.is_some() {
+                    //            let mut updated_conv = data.selected_conv.clone().unwrap();
+                    //            updated_conv
+                    //                .messages
+                    //                .push_back(MessageState::from_entity(new_msg));
+                    //            data.selected_conv = Some(updated_conv);
+                    //        }
+                    //    });
+                }
+            }
+        }
+    });
+
+    core_handle.connect_all_relays().await;
+    core_handle.subscribe().await;
     info!("Broker initialized and waiting for commands");
     while let Some(broker_event) = broker_receiver.recv().await {
         match broker_event {
@@ -99,9 +107,14 @@ pub async fn start_broker(
                     //    });
                 };
             }
+            BrokerEvent::GetConversation { pk, resp } => {
+                if let Some(conv) = core_handle.get_conv(pk) {
+                    resp.send(Ok(conv));
+                };
+            }
             BrokerEvent::RestoreKeyPair { sk, resp } => {
-                core_handle.import_user_sk(sk);
-                resp.send(Ok(core_handle.get_user().get_pk().to_string()));
+                core_handle.import_user_sk(sk.clone());
+                resp.send(Ok((sk, core_handle.get_user().get_pk().to_string())));
 
                 core_handle.subscribe().await;
             }

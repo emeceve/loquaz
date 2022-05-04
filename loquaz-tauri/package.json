@@ -10,10 +10,12 @@
     "tauri-dev": "RUST_LOG=debug tauri dev"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^1.8.1",
     "@tauri-apps/api": "^1.0.0-rc.1",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "react-hook-form": "^7.28.1",
+    "react-redux": "^7.2.8",
     "react-router-dom": "^6.2.2"
   },
   "devDependencies": {
