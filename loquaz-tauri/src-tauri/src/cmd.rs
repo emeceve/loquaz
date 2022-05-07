@@ -19,7 +19,8 @@ pub async fn get_config(
     state
         .core_command_sender
         .send(BrokerEvent::LoadConfigs { resp: res_tx })
-        .await;
+        .await
+        .map_err(|e| format!("Send Error: {}", e.to_string()))?;
 
     res_rx.await.map_err(|err| format!("{}", err))
 }
@@ -34,9 +35,10 @@ pub async fn get_conversation(
     state
         .core_command_sender
         .send(BrokerEvent::GetConversation { pk, resp: res_tx })
-        .await;
+        .await
+        .map_err(|e| format!("Send Error: {}", e.to_string()))?;
 
-    res_rx.await.map_err(|err| format!("{}", err)).unwrap()
+    res_rx.await.map_err(|err| format!("{}", err))?
 }
 
 #[command]
@@ -49,9 +51,10 @@ pub async fn restore_key_pair(
     state
         .core_command_sender
         .send(BrokerEvent::RestoreKeyPair { sk, resp: res_tx })
-        .await;
+        .await
+        .map_err(|e| format!("Send Error: {}", e.to_string()))?;
 
-    res_rx.await.map_err(|err| format!("{}", err)).unwrap()
+    res_rx.await.map_err(|err| format!("{}", err))?
 }
 #[command]
 pub async fn generate_key_pair(
@@ -62,7 +65,8 @@ pub async fn generate_key_pair(
     state
         .core_command_sender
         .send(BrokerEvent::GenerateNewKeyPair { resp: res_tx })
-        .await;
+        .await
+        .map_err(|e| format!("Send Error: {}", e.to_string()))?;
 
     res_rx.await.map_err(|err| format!("{}", err)).unwrap()
 }
@@ -84,7 +88,8 @@ pub async fn add_contact(
                 new_contact,
                 resp: res_tx,
             })
-            .await;
+            .await
+            .map_err(|e| format!("Send Error: {}", e.to_string()))?;
         return res_rx.await.map_err(|err| format!("{}", err));
     }
     Err(format!("Invalid PK {}", pk))
@@ -104,7 +109,9 @@ pub async fn remove_contact(
             contact,
             resp: res_tx,
         })
-        .await;
+        .await
+        .map_err(|e| format!("Send Error: {}", e.to_string()))?;
+
     res_rx.await.map_err(|e| format!("{}", e))
 }
 
@@ -115,7 +122,9 @@ pub async fn add_relay(url: String, state: tauri::State<'_, AppState>) -> Result
     state
         .core_command_sender
         .send(BrokerEvent::AddRelay { url, resp: res_tx })
-        .await;
+        .await
+        .map_err(|e| format!("Send Error: {}", e.to_string()))?;
+
     res_rx.await.map_err(|err| format!("{}", err)).unwrap()
 }
 
@@ -126,21 +135,13 @@ pub async fn remove_relay(url: String, state: tauri::State<'_, AppState>) -> Res
     state
         .core_command_sender
         .send(BrokerEvent::RemoveRelay { url, resp: res_tx })
-        .await;
+        .await
+        .map_err(|e| format!("Send Error: {}", e.to_string()))?;
     res_rx.await.map_err(|err| format!("{}", err)).unwrap()
 }
 
 #[command]
-pub fn message(value: String, state: tauri::State<'_, AppState>) -> String {
+pub fn _message(value: String, _state: tauri::State<'_, AppState>) -> String {
     debug!("Received message from frontend {}", value);
     format!("Got message {} sdfsd", value)
 }
-
-//#[command]
-//pub fn init_process(window: Window, state: tauri::State<'_, AppState>) {
-//    println!("Initing process");
-//    std::thread::spawn(move || loop {
-//        window.emit("test-event", "Test").unwrap();
-//        std::thread::sleep(std::time::Duration::from_secs(3));
-//    });
-//}

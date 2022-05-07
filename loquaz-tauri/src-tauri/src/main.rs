@@ -33,7 +33,7 @@ async fn main() {
     info!("Initializing tauri app");
     tauri::Builder::default()
         .setup(|app| {
-            let main_window = app.get_window("main").unwrap();
+            let _main_window = app.get_window("main").expect("Failed to get main window");
             //           tauri::async_runtime::spawn(async move {
             //    start_broker(main_window);
             //  main_window.emit("test-event", "Test").unwrap();

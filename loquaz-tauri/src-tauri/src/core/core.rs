@@ -1,10 +1,12 @@
+use crate::core::conversations;
+
 use super::{
     config::{Config, ConfigProvider, Contact},
     conversations::{Conversation, Conversations, ConvsNotifications},
     relay_pool::{RelayPool, RelayPoolNotifications},
     user::User,
 };
-use log::debug;
+use log::{debug, error};
 use nostr::Event;
 use secp256k1::schnorrsig::PublicKey;
 use std::{
@@ -47,6 +49,30 @@ pub struct CoreTaskHandle {
     user: Arc<Mutex<User>>,
 }
 
+fn handle_notification(
+    notification: RelayPoolNotifications,
+    conversations: Arc<Mutex<Conversations>>,
+    user: Arc<Mutex<User>>,
+) -> Result<(), String> {
+    let mut conversations = conversations
+        .lock()
+        .map_err(|_e| format!("Failed to get lock on conversations"))?;
+
+    let mut user = user
+        .lock()
+        .map_err(|_e| format!("Failed to get lock on user"))?;
+
+    match notification {
+        RelayPoolNotifications::ReceivedEvent { ev } => {
+            conversations
+                .try_add_message_from_ev(ev, &user)
+                .map_err(|_e| format!("Failed to add message from ev"));
+        }
+        _ => (),
+    };
+    Ok(())
+}
+
 impl CoreTaskHandle {
     pub fn new() -> Self {
         let config = ConfigProvider::load();
@@ -66,16 +92,15 @@ impl CoreTaskHandle {
         let conversations_clone = conversations.clone();
         let user_clone = user.clone();
         tokio::spawn(async move {
-            while let Ok(noti) = rec_ch.recv().await {
-                debug!("Received from broadcast {:?}", noti);
-                match noti {
-                    RelayPoolNotifications::ReceivedEvent { ev } => {
-                        conversations_clone
-                            .lock()
-                            .unwrap()
-                            .try_add_message_from_ev(ev, &user_clone.lock().unwrap());
-                    }
-                    _ => (),
+            while let Ok(notification) = rec_ch.recv().await {
+                debug!("Received from broadcast {:?}", notification);
+
+                if let Err(e) = handle_notification(
+                    notification,
+                    conversations_clone.clone(),
+                    user_clone.clone(),
+                ) {
+                    error!("Handle notification error: {}", e.to_string())
                 };
             }
         });
@@ -120,7 +145,7 @@ impl CoreTaskHandle {
             send_to_relays = true;
             new_ev = Some(ev);
         } else {
-            dbg!("Error while creating event");
+            debug!("Error while creating event");
         }
 
         //This is necessary because we cant send a mutex to another thread

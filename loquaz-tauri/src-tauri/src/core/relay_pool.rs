@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use futures::{SinkExt, StreamExt};
+use log::{debug, error};
 use nostr::{self, ClientMessage, Event, Keys, RelayMessage, SubscriptionFilter};
 use tokio::sync::{
     broadcast,
@@ -32,20 +33,24 @@ impl RelayPoolTask {
         match msg {
             RelayPoolEv::ReceivedMsg { relay_url, msg } => {
                 // TODO: set up optional logging
-                dbg!(format!("Received message from {}: {:?}", &relay_url, &msg));
+                debug!("Received message from {}: {:?}", &relay_url, &msg);
                 match msg {
                     RelayMessage::Event {
                         event,
-                        subscription_id,
+                        subscription_id: _,
                     } => {
                         //Verifies if the event is valid
                         if let Ok(_) = event.verify() {
                             //Adds only new events
                             if let None = self.events.insert(event.id.to_string(), event.clone()) {
                                 // TODO: set up optional logging
-                                dbg!("New event, propagates");
-                                self.notification_sender
-                                    .send(RelayPoolNotifications::ReceivedEvent { ev: event });
+                                debug!("New event, propagates");
+                                if let Err(e) = self
+                                    .notification_sender
+                                    .send(RelayPoolNotifications::ReceivedEvent { ev: event })
+                                {
+                                    error!("RelayPoolNotifications::ReceivedEvent error: {:?}", e);
+                                };
                             }
                         }
                     }
@@ -106,22 +111,30 @@ impl RelayPool {
     }
 
     pub fn list_relays(&self) -> Vec<Relay> {
-        self.relays.iter().map(|(k, v)| v.to_owned()).collect()
+        self.relays.iter().map(|(_k, v)| v.to_owned()).collect()
     }
     pub async fn remove_contact_events(&self, contact: Contact) {
         //TODO: Remove this convertion when change contact pk to Keys type
         let c_keys = Keys::new_pub_only(&contact.pk.to_string()).unwrap();
-        self.pool_task_sender
+        if let Err(e) = self
+            .pool_task_sender
             .send(RelayPoolEv::RemoveContactEvents(c_keys))
-            .await;
+            .await
+        {
+            error!("remove_contact_events send error: {}", e.to_string())
+        };
     }
     pub async fn send_ev(&self, ev: Event) {
         //Send to pool task to save in all received events
-        self.pool_task_sender
+        if let Err(e) = self
+            .pool_task_sender
             .send(RelayPoolEv::EventSent { ev: ev.clone() })
-            .await;
+            .await
+        {
+            error!("send_ev send error: {}", e.to_string())
+        };
         let relays_clone = self.relays.clone();
-        for (k, v) in relays_clone.iter() {
+        for (_k, v) in relays_clone.iter() {
             v.send_relay_ev(RelayEv::SendMsg(ClientMessage::new_event(ev.clone())))
                 .await;
         }
@@ -207,11 +220,11 @@ impl Relay {
 
     pub async fn connect(&mut self) {
         let url = url::Url::parse(&self.url).unwrap();
-        dbg!("Trying to connect {} ...", url.to_string());
+        debug!("Trying to connect {} ...", url.to_string());
 
         //TODO: Maybe propagate errors
         if let Ok((ws_stream, _)) = connect_async(&url).await {
-            dbg!("Successfully connected to relay {}!", &url.to_string());
+            debug!("Successfully connected to relay {}!", &url.to_string());
             self.status = RelayStatus::Connected;
 
             let (mut ws_tx, mut ws_rx) = ws_stream.split();
@@ -223,16 +236,20 @@ impl Relay {
                 while let Some(relay_ev) = relay_receiver.recv().await {
                     match relay_ev {
                         RelayEv::SendMsg(msg) => {
-                            dbg!("Sending message {}", msg.to_json());
-                            ws_tx.send(Message::Text(msg.to_json())).await;
+                            println!("Sending message {}", msg.to_json());
+                            if let Err(e) = ws_tx.send(Message::Text(msg.to_json())).await {
+                                error!("RelayEv::SendMsg error: {:?}", e);
+                            };
                         }
                         RelayEv::Close => {
-                            ws_tx.close().await;
+                            if let Err(e) = ws_tx.close().await {
+                                error!("RelayEv::Close error: {:?}", e);
+                            };
                             relay_receiver.close();
                         }
                     }
                 }
-                dbg!("Closed RELAY TX to WS RX {}", url_clone);
+                debug!("Closed RELAY TX to WS RX {}", url_clone);
             });
 
             let pool_sender = self.pool_sender.clone();
@@ -255,29 +272,32 @@ impl Relay {
                                         .await
                                     {
                                         Ok(_) => {
-                                            dbg!("[CH Relay -> RelayPool] Sent to relay pool");
+                                            debug!("[CH Relay -> RelayPool] Sent to relay pool");
                                         }
                                         Err(err) => {
-                                            dbg!("[CH Relay -> RelayPool] {}", &err);
+                                            debug!("[CH Relay -> RelayPool] {}", &err);
                                         }
                                     }
                                 }
                                 Err(err) => {
-                                    dbg!("{}", err);
+                                    error!("{}", err);
                                 }
                             }
                         }
                         Err(err) => {
-                            dbg!("{}", err);
+                            error!("{}", err);
                         }
                     }
                 }
-                pool_sender
+                if let Err(e) = pool_sender
                     .send(RelayPoolEv::RelayDisconnected {
                         relay_url: relay_url.clone(),
                     })
-                    .await;
-                dbg!("Closed WS RX to RELAY POOL TX {}", relay_url);
+                    .await
+                {
+                    error!("pool_send error: {}", e.to_string())
+                };
+                error!("Closed WS RX to RELAY POOL TX {}", relay_url);
             });
         }
     }
@@ -293,7 +313,9 @@ impl Relay {
 
     async fn send_relay_ev(&self, relay_msg: RelayEv) {
         if self.relay_sender.is_some() {
-            self.relay_sender.clone().unwrap().send(relay_msg).await;
+            if let Err(e) = self.relay_sender.clone().unwrap().send(relay_msg).await {
+                error!("send_relay_ev error: {}", e.to_string())
+            };
         }
     }
 }
@@ -302,7 +324,7 @@ impl Relay {
 pub enum RelayStatus {
     Disconnected,
     Connected,
-    Connecting,
+    _Connecting,
 }
 
 #[derive(Debug)]
@@ -322,7 +344,7 @@ pub enum RelayPoolEv {
 #[derive(Debug, Clone)]
 pub enum RelayPoolNotifications {
     ReceivedEvent { ev: Event },
-    RelaysStatusChanged { relays: Vec<Relay> },
+    _RelaysStatusChanged { relays: Vec<Relay> },
 }
 
 #[derive(Debug)]
