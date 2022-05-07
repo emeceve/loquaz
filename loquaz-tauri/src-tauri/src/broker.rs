@@ -1,5 +1,4 @@
 use log::{debug, info};
-use tauri::Wry;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::core::{

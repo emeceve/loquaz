@@ -12,7 +12,7 @@ mod cmd;
 mod core;
 
 use broker::{start_broker, BrokerEvent};
-use log::{debug, info};
+use log::info;
 
 use crate::cmd::{
     add_contact, add_relay, generate_key_pair, get_config, get_conversation, remove_contact,
