@@ -13,6 +13,8 @@ use tokio::sync::broadcast;
 pub enum ConversationsError {
     #[error("Adding new message failed")]
     AddMessageFailed,
+    #[error("SendError")]
+    SendError,
 }
 #[derive(Clone)]
 pub enum ConvsNotifications {
@@ -76,7 +78,8 @@ impl Conversations {
 
                         //Send notification to listeners
                         self.conv_noti_sender
-                            .send(ConvsNotifications::NewMessage(new_msg));
+                            .send(ConvsNotifications::NewMessage(new_msg))
+                            .map_err(|_e| ConversationsError::SendError)?;
                         Ok(())
                     }
                     Err(e) => {
@@ -110,7 +113,7 @@ impl Conversations {
     }
 
     pub fn list_convs(&self) -> Vec<Conversation> {
-        self.convs.iter().map(|(k, v)| v.to_owned()).collect()
+        self.convs.iter().map(|(_k, v)| v.to_owned()).collect()
     }
 }
 

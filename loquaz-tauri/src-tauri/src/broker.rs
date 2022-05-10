@@ -1,12 +1,22 @@
-use log::{debug, info};
-use tauri::Wry;
-use tokio::sync::{mpsc, oneshot};
+use log::{debug, error, info};
+use tokio::sync::{
+    mpsc::{self},
+    oneshot,
+};
 
 use crate::core::{
     config::Contact,
     conversations::{Conversation, ConvsNotifications},
     core::{CoreTaskHandle, CoreTaskHandleEvent},
 };
+
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum BrokerEventError {
+    #[error("Failed Send")]
+    FailedSend,
+}
 
 pub enum BrokerEvent {
     AddRelay {
@@ -63,6 +73,82 @@ pub type Responder<T> = oneshot::Sender<T>;
 //    ConfigUpdated { config: ConfigState },
 //}
 
+async fn handle_broker_event(
+    broker_event: BrokerEvent,
+    core_handle: &mut CoreTaskHandle,
+) -> Result<(), BrokerEventError> {
+    match broker_event {
+        BrokerEvent::SendMessage { pk, content } => {
+            core_handle.send_msg_to_contact(&pk, &content).await;
+            Ok(())
+        }
+        BrokerEvent::SetConversation { pk } => {
+            if let Some(_conv) = core_handle.get_conv(pk) {
+                //    event_sink.add_idle_callback(move |data: &mut AppState| {
+                //        data.selected_conv = Some(ConversationState::from_entity(conv));
+                //    });
+            };
+
+            Ok(())
+        }
+        BrokerEvent::GetConversation { pk, resp } => {
+            if let Some(conv) = core_handle.get_conv(pk) {
+                resp.send(Ok(conv))
+                    .map_err(|_e| BrokerEventError::FailedSend)?
+            };
+            Ok(())
+        }
+        BrokerEvent::RestoreKeyPair { sk, resp } => {
+            core_handle.import_user_sk(sk.clone());
+            resp.send(Ok((sk, core_handle.get_user().get_pk().to_string())))
+                .map_err(|_e| BrokerEventError::FailedSend)?;
+
+            Ok(core_handle.subscribe().await)
+        }
+        BrokerEvent::GenerateNewKeyPair { resp } => {
+            core_handle.gen_new_user_keypair();
+            let user = core_handle.get_user();
+            resp.send(Ok((
+                user.get_sk().unwrap().to_string(),
+                user.get_pk().to_string(),
+            )))
+            .map_err(|_e| BrokerEventError::FailedSend)
+            // core_handle.subscribe().await;
+        }
+        BrokerEvent::AddRelay { url, resp } => {
+            if let CoreTaskHandleEvent::RelayAdded(Ok(_)) = core_handle.add_relay(url).await {
+                resp.send(Ok(())).map_err(|_e| BrokerEventError::FailedSend)
+                //   update_config_state(&event_sink, &core_handle).await;
+            } else {
+                resp.send(Err(format!("Could not add relay")))
+                    .map_err(|_e| BrokerEventError::FailedSend)
+            }
+        }
+        BrokerEvent::RemoveRelay { url, resp } => {
+            if let CoreTaskHandleEvent::RemovedRelay(Ok(_)) = core_handle.remove_relay(url).await {
+                resp.send(Ok(())).map_err(|_e| BrokerEventError::FailedSend)
+            } else {
+                resp.send(Err(format!("Failed to remove")))
+                    .map_err(|_e| BrokerEventError::FailedSend)
+            }
+        }
+        BrokerEvent::ConnectRelay { url } => Ok(core_handle.connect_relay(url).await),
+        BrokerEvent::DisconnectRelay { url } => Ok(core_handle.disconnect_relay(url).await),
+        BrokerEvent::SubscribeInRelays { pk: _ } => Ok(core_handle.subscribe().await),
+        BrokerEvent::AddContact { new_contact, resp } => {
+            let _res = core_handle.add_contact(new_contact).await;
+            resp.send(()).map_err(|_e| BrokerEventError::FailedSend)
+        }
+        BrokerEvent::RemoveContact { contact, resp } => {
+            let _res = core_handle.remove_contact(contact).await;
+            resp.send(()).map_err(|_e| BrokerEventError::FailedSend)
+        }
+        BrokerEvent::LoadConfigs { resp } => resp
+            .send(core_handle.get_config())
+            .map_err(|_e| BrokerEventError::FailedSend),
+    }
+}
+
 pub async fn start_broker(
     mut broker_receiver: mpsc::Receiver<BrokerEvent>,
     //event_sink: tauri::Window<Wry>,
@@ -77,16 +163,6 @@ pub async fn start_broker(
             match noti {
                 ConvsNotifications::NewMessage(new_msg) => {
                     debug!("{:?}", new_msg);
-
-                    //    ev_sink_clone.add_idle_callback(move |data: &mut AppState| {
-                    //        if data.selected_conv.is_some() {
-                    //            let mut updated_conv = data.selected_conv.clone().unwrap();
-                    //            updated_conv
-                    //                .messages
-                    //                .push_back(MessageState::from_entity(new_msg));
-                    //            data.selected_conv = Some(updated_conv);
-                    //        }
-                    //    });
                 }
             }
         }
@@ -96,117 +172,8 @@ pub async fn start_broker(
     core_handle.subscribe().await;
     info!("Broker initialized and waiting for commands");
     while let Some(broker_event) = broker_receiver.recv().await {
-        match broker_event {
-            BrokerEvent::SendMessage { pk, content } => {
-                core_handle.send_msg_to_contact(&pk, &content).await;
-            }
-            BrokerEvent::SetConversation { pk } => {
-                if let Some(conv) = core_handle.get_conv(pk) {
-                    //    event_sink.add_idle_callback(move |data: &mut AppState| {
-                    //        data.selected_conv = Some(ConversationState::from_entity(conv));
-                    //    });
-                };
-            }
-            BrokerEvent::GetConversation { pk, resp } => {
-                if let Some(conv) = core_handle.get_conv(pk) {
-                    resp.send(Ok(conv));
-                };
-            }
-            BrokerEvent::RestoreKeyPair { sk, resp } => {
-                core_handle.import_user_sk(sk.clone());
-                resp.send(Ok((sk, core_handle.get_user().get_pk().to_string())));
-
-                core_handle.subscribe().await;
-            }
-            BrokerEvent::GenerateNewKeyPair { resp } => {
-                core_handle.gen_new_user_keypair();
-                let user = core_handle.get_user();
-                resp.send(Ok((
-                    user.get_sk().unwrap().to_string(),
-                    user.get_pk().to_string(),
-                )));
-                // core_handle.subscribe().await;
-            }
-            BrokerEvent::AddRelay { url, resp } => {
-                if let CoreTaskHandleEvent::RelayAdded(Ok(_)) = core_handle.add_relay(url).await {
-                    resp.send(Ok(()));
-                    //   update_config_state(&event_sink, &core_handle).await;
-                } else {
-                    resp.send(Err(format!("Could not add relay")));
-                }
-            }
-            BrokerEvent::RemoveRelay { url, resp } => {
-                if let CoreTaskHandleEvent::RemovedRelay(Ok(_)) =
-                    core_handle.remove_relay(url).await
-                {
-                    resp.send(Ok(()));
-                } else {
-                    resp.send(Err(format!("Failed to remove")));
-                }
-            }
-            BrokerEvent::ConnectRelay { url } => {
-                core_handle.connect_relay(url).await;
-            }
-            BrokerEvent::DisconnectRelay { url } => {
-                core_handle.disconnect_relay(url).await;
-            }
-
-            BrokerEvent::SubscribeInRelays { pk } => {
-                core_handle.subscribe().await;
-            }
-            BrokerEvent::AddContact { new_contact, resp } => {
-                let res = core_handle.add_contact(new_contact).await;
-                resp.send(());
-            }
-            BrokerEvent::RemoveContact { contact, resp } => {
-                let res = core_handle.remove_contact(contact).await;
-                resp.send(());
-            }
-            BrokerEvent::LoadConfigs { resp } => {
-                let config = core_handle.get_config();
-                resp.send(core_handle.get_config());
-            }
+        if let Err(e) = handle_broker_event(broker_event, &mut core_handle).await {
+            error!("broker_event error: {:?}", e.to_string())
         }
     }
 }
-
-//fn load_config(core: &CoreTaskHandle) -> ConfigState {
-//    let (relays_url, contacts) = core.get_config();
-//    let mut updated_config_state = ConfigState::new();
-//    updated_config_state.relays_url = Vector::from(relays_url);
-//    updated_config_state.contacts = contacts
-//        .iter()
-//        .map(|c| ContactState::new(&c.alias, &c.pk.to_string()))
-//        .collect();
-//
-//    updated_config_state
-//}
-
-//fn update_user_state(event_sink: &ExtEventSink, core_handle: &CoreTaskHandle) {
-//    let user = core_handle.get_user();
-//    //   event_sink.add_idle_callback(move |data: &mut AppState| {
-//    //       data.user = UserState::new(
-//    //           &user.get_sk().unwrap().to_string(),
-//    //           &user.get_pk().to_string(),
-//    //       );
-//    //   });
-//}
-
-//async fn update_config_state(event_sink: &ExtEventSink, core_handle: &CoreTaskHandle) {
-//    let (relays_url, contacts) = core_handle.get_config();
-//    let mut updated_config_state = ConfigState::new();
-//    updated_config_state.relays_url = Vector::from(relays_url);
-//    updated_config_state.contacts = contacts
-//        .iter()
-//        .map(|c| ContactState::new(&c.alias, &c.pk.to_string()))
-//        .collect();
-//    //   event_sink.add_idle_callback(move |data: &mut AppState| {
-//    //       data.config = updated_config_state;
-//    //   });
-//}
-
-//fn send_res_ev_to_druid(event_sink: &ExtEventSink, res: BrokerNotification) {
-//    event_sink
-//        .submit_command(BROKER_NOTI, res, Target::Auto)
-//        .expect("Error while send core events to Druid event sink!");
-//}

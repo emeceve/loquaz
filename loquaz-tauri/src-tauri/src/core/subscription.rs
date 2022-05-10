@@ -24,7 +24,7 @@ impl Subscription {
         self.filters.clone()
     }
 
-    pub fn add_channel(&mut self, relay_url: String, channel: Channel) {
+    pub fn _add_channel(&mut self, relay_url: String, channel: Channel) {
         self.channels.insert(relay_url, channel);
     }
 

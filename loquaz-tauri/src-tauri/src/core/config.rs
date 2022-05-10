@@ -52,11 +52,11 @@ impl ConfigProvider {
     }
 
     pub fn list_contacts(&self) -> Vec<Contact> {
-        self.contacts.iter().map(|(k, v)| v.to_owned()).collect()
+        self.contacts.iter().map(|(_k, v)| v.to_owned()).collect()
     }
 
     pub fn list_relays_url(&self) -> Vec<String> {
-        self.relays_url.iter().map(|(k, v)| v.to_owned()).collect()
+        self.relays_url.iter().map(|(_k, v)| v.to_owned()).collect()
     }
 
     pub fn save(&self) -> Result<(), Error> {
@@ -64,16 +64,16 @@ impl ConfigProvider {
         let relays_url: Vec<String> = self.list_relays_url();
         let config_file = Config::new(contacts, relays_url);
         let serialized = serde_json::to_string_pretty(&config_file)?;
-        let config_path = Self::get_path();
+        let _config_path = Self::get_path();
 
         std::fs::write(Self::get_config_path(), serialized)?;
         Ok(())
     }
 
     pub fn load() -> Self {
-        let mut dir = Self::get_path();
+        let dir = Self::get_path();
         info!("Loading configs from file {}", dir.display());
-        fs::create_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("Can't create dir");
         let file = File::open(&Self::get_config_path());
 
         match file {

@@ -18,7 +18,7 @@ impl User {
         }
     }
 
-    pub fn get_keys(&self) -> nostr::Keys {
+    pub fn _get_keys(&self) -> nostr::Keys {
         self.keys.clone()
     }
 
