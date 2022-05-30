@@ -1,5 +1,3 @@
-use crate::core::conversations;
-
 use super::{
     config::{Config, ConfigProvider, Contact},
     conversations::{Conversation, Conversations, ConvsNotifications},
@@ -30,7 +28,6 @@ pub enum CoreTaskHandleError {
 }
 
 //####### Core Task Handle  #########
-
 #[derive(Debug)]
 pub enum CoreTaskHandleEvent {
     ReceivedEvent { ev: Event },
@@ -66,7 +63,7 @@ fn handle_notification(
         RelayPoolNotifications::ReceivedEvent { ev } => {
             conversations
                 .try_add_message_from_ev(ev, &user)
-                .map_err(|_e| format!("Failed to add message from ev"));
+                .map_err(|_e| format!("Failed to add message from ev"))?;
         }
         _ => (),
     };
@@ -160,20 +157,21 @@ impl CoreTaskHandle {
         return self.relay_pool.get_notifications_ch();
     }
 
-    pub async fn add_relay(&mut self, url: String) -> CoreTaskHandleEvent {
+    pub fn add_relay(&mut self, url: String) -> CoreTaskHandleEvent {
         self.relay_pool.add(&url);
-        self.config
-            .add_relay(url)
-            .map_err(|_| CoreTaskHandleError::AddRelayFailed);
-
-        CoreTaskHandleEvent::RelayAdded(Ok(()))
+        CoreTaskHandleEvent::RelayAdded(
+            self.config
+                .add_relay(url)
+                .map_err(|_| CoreTaskHandleError::AddRelayFailed),
+        )
     }
 
-    pub async fn remove_relay(&mut self, url: String) -> CoreTaskHandleEvent {
-        self.config
-            .remove_relay(&url)
-            .map_err(|_| CoreTaskHandleError::AddRelayFailed);
-        CoreTaskHandleEvent::RemovedRelay(Ok(()))
+    pub fn remove_relay(&mut self, url: String) -> CoreTaskHandleEvent {
+        CoreTaskHandleEvent::RemovedRelay(
+            self.config
+                .remove_relay(&url)
+                .map_err(|_| CoreTaskHandleError::RemoveRelayFailed),
+        )
     }
     pub async fn connect_all_relays(&mut self) {
         self.relay_pool.connect_all().await;
@@ -217,14 +215,15 @@ impl CoreTaskHandle {
 
         self.relay_pool.start_sub(filters).await;
     }
-    pub async fn add_contact(&mut self, contact: Contact) {
-        self.config.add_contact(contact.clone());
+    pub fn add_contact(&mut self, contact: Contact) -> Result<(), CoreTaskHandleError> {
+        self.config
+            .add_contact(contact.clone())
+            .map_err(|_| CoreTaskHandleError::AddContactFailed)?;
         self.conversations
             .lock()
             .unwrap()
             .add_conv(Conversation::new(contact));
-        //Update filters and resubscribe based on updated conversations
-        self.subscribe().await;
+        Ok(())
     }
 
     pub async fn remove_contact(&mut self, contact: Contact) {

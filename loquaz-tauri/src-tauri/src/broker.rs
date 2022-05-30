@@ -1,8 +1,5 @@
 use log::{debug, error, info};
-use tokio::sync::{
-    mpsc::{self},
-    oneshot,
-};
+use tokio::sync::{mpsc, oneshot};
 
 use crate::core::{
     config::Contact,
@@ -112,11 +109,13 @@ async fn handle_broker_event(
                 user.get_sk().unwrap().to_string(),
                 user.get_pk().to_string(),
             )))
-            .map_err(|_e| BrokerEventError::FailedSend)
-            // core_handle.subscribe().await;
+            .map_err(|_e| BrokerEventError::FailedSend);
+            core_handle.subscribe().await;
+            Ok(())
         }
+
         BrokerEvent::AddRelay { url, resp } => {
-            if let CoreTaskHandleEvent::RelayAdded(Ok(_)) = core_handle.add_relay(url).await {
+            if let CoreTaskHandleEvent::RelayAdded(Ok(_)) = core_handle.add_relay(url) {
                 resp.send(Ok(())).map_err(|_e| BrokerEventError::FailedSend)
                 //   update_config_state(&event_sink, &core_handle).await;
             } else {
@@ -125,7 +124,7 @@ async fn handle_broker_event(
             }
         }
         BrokerEvent::RemoveRelay { url, resp } => {
-            if let CoreTaskHandleEvent::RemovedRelay(Ok(_)) = core_handle.remove_relay(url).await {
+            if let CoreTaskHandleEvent::RemovedRelay(Ok(_)) = core_handle.remove_relay(url) {
                 resp.send(Ok(())).map_err(|_e| BrokerEventError::FailedSend)
             } else {
                 resp.send(Err(format!("Failed to remove")))
@@ -136,8 +135,12 @@ async fn handle_broker_event(
         BrokerEvent::DisconnectRelay { url } => Ok(core_handle.disconnect_relay(url).await),
         BrokerEvent::SubscribeInRelays { pk: _ } => Ok(core_handle.subscribe().await),
         BrokerEvent::AddContact { new_contact, resp } => {
-            let _res = core_handle.add_contact(new_contact).await;
-            resp.send(()).map_err(|_e| BrokerEventError::FailedSend)
+            let _res = core_handle.add_contact(new_contact);
+            resp.send(()).map_err(|_e| BrokerEventError::FailedSend);
+
+            //Update filters and resubscribe based on updated conversations
+
+            Ok(core_handle.subscribe().await)
         }
         BrokerEvent::RemoveContact { contact, resp } => {
             let _res = core_handle.remove_contact(contact).await;

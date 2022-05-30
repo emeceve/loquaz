@@ -46,11 +46,6 @@ impl ConfigProvider {
         self.save()
     }
 
-    pub fn delete_contact(&mut self, pk: &str) {
-        self.contacts.remove(pk);
-        self.save().unwrap();
-    }
-
     pub fn list_contacts(&self) -> Vec<Contact> {
         self.contacts.iter().map(|(_k, v)| v.to_owned()).collect()
     }
