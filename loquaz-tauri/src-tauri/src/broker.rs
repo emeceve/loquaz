@@ -13,6 +13,8 @@ use thiserror::Error;
 pub enum BrokerEventError {
     #[error("Failed Send")]
     FailedSend,
+    #[error("Command failed: `{0}`")]
+    CommandFailed(String),
 }
 
 pub enum BrokerEvent {
@@ -76,7 +78,10 @@ async fn handle_broker_event(
 ) -> Result<(), BrokerEventError> {
     match broker_event {
         BrokerEvent::SendMessage { pk, content } => {
-            core_handle.send_msg_to_contact(&pk, &content).await;
+            core_handle
+                .send_msg_to_contact(&pk, &content)
+                .await
+                .map_err(|err| BrokerEventError::CommandFailed(err.to_string()))?;
             Ok(())
         }
         BrokerEvent::SetConversation { pk } => {

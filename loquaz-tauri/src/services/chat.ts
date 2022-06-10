@@ -17,3 +17,7 @@ export enum MessageSource {
 export async function getConversation(pk: string): Promise<Conversation> {
   return await invoke("get_conversation", { pk });
 }
+
+export async function sendMsg(pk: string, content: string): Promise<void> {
+  await invoke("send_msg", { pk, content });
+}

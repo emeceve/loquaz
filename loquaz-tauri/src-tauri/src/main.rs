@@ -16,7 +16,7 @@ use log::info;
 
 use crate::cmd::{
     add_contact, add_relay, generate_key_pair, get_config, get_conversation, remove_contact,
-    remove_relay, restore_key_pair,
+    remove_relay, restore_key_pair, send_msg,
 };
 
 use tokio::sync::mpsc;
@@ -58,7 +58,8 @@ async fn main() {
             remove_relay,
             remove_contact,
             generate_key_pair,
-            get_conversation
+            get_conversation,
+            send_msg
         ])
         .run(tauri::generate_context!("tauri.conf.json"))
         .expect("error while running tauri application");

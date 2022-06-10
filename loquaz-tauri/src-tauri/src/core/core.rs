@@ -125,32 +125,29 @@ impl CoreTaskHandle {
         )
     }
 
-    pub async fn send_msg_to_contact(&mut self, contact_pk: &str, content: &str) {
-        let mut send_to_relays = false;
-        let mut new_ev = None;
-
-        let user = self.user.lock().unwrap().clone();
-        if let Ok(ev) = Event::new_encrypted_direct_msg(
+    pub async fn send_msg_to_contact(
+        &mut self,
+        contact_pk: &str,
+        content: &str,
+    ) -> Result<(), Box<dyn std::error::Error + '_>> {
+        let user = self.user.lock()?.clone();
+        let ev = Event::new_encrypted_direct_msg(
             &user.keys,
-            &nostr::Keys::new_pub_only(&contact_pk.to_string()).unwrap(),
+            &nostr::Keys::new_pub_only(&contact_pk.to_string())?,
             content,
-        ) {
-            self.conversations
-                .lock()
-                .unwrap()
-                .try_add_message_from_ev(ev.clone(), &user);
-            send_to_relays = true;
-            new_ev = Some(ev);
-        } else {
-            debug!("Error while creating event");
-        }
+        )?;
+
+        self.conversations
+            .lock()?
+            .try_add_message_from_ev(ev.clone(), &user)?;
 
         //This is necessary because we cant send a mutex to another thread
         //and Tokio runtime can move this task between threads at every .await
         //https://tokio.rs/tokio/tutorial/shared-state
-        if send_to_relays && new_ev.is_some() {
-            self.relay_pool.send_ev(new_ev.unwrap()).await;
-        }
+        //
+        self.relay_pool.send_ev(ev).await;
+
+        Ok(())
     }
 
     pub fn get_noti_ch(&self) -> broadcast::Receiver<RelayPoolNotifications> {

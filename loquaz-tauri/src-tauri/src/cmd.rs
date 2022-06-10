@@ -141,7 +141,21 @@ pub async fn remove_relay(url: String, state: tauri::State<'_, AppState>) -> Res
 }
 
 #[command]
-pub fn _message(value: String, _state: tauri::State<'_, AppState>) -> String {
-    debug!("Received message from frontend {}", value);
-    format!("Got message {} sdfsd", value)
+pub async fn send_msg(
+    pk: String,
+    content: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    debug!("send_msg command called");
+    let (_, res_rx) = oneshot::channel();
+
+    state
+        .core_command_sender
+        .send(BrokerEvent::SendMessage { pk, content })
+        .await
+        .map_err(|e| format!("Send Error: {}", e.to_string()))?;
+
+    res_rx.await.map_err(|e| format!("{}", e))?;
+
+    Ok(())
 }

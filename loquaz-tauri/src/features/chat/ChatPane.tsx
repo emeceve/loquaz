@@ -2,30 +2,24 @@ import Button from "../../common/components/Button";
 import React, { FormEvent, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import { listen } from "@tauri-apps/api/event";
-import { useAppSelector } from "../../common/hooks";
-import { selectCurrentContact, selectCurrentConversation } from "./chatSlice";
+import { useAppDispatch, useAppSelector } from "../../common/hooks";
+import {
+  selectCurrentContact,
+  selectCurrentConversation,
+  sendMessage,
+} from "./chatSlice";
 import { Message, MessageSource } from "../../services/chat";
 
 export default function ChatPane() {
   const [messageInput, setMessageInput] = useState("");
-  const [responseContainer, setResponsecontainer] = useState("");
   const currentContact = useAppSelector(selectCurrentContact);
   const currentConversation = useAppSelector(selectCurrentConversation);
-
-  function updateResponse(response: any) {
-    setResponsecontainer(
-      typeof response === "string" ? response : JSON.stringify(response)
-    );
-  }
+  const dispatch = useAppDispatch();
 
   const submitMessage = async (e: FormEvent) => {
     e.preventDefault();
-    // e.preventDefault();
     try {
-      const response = await invoke("message", {
-        value: messageInput,
-      });
-      updateResponse(response);
+      dispatch(sendMessage({ pk: currentContact.pk, content: messageInput }));
       setMessageInput("");
     } catch (error) {
       console.log("error ", error);

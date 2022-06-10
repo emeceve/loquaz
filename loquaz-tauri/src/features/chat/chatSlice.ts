@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { Conversation, getConversation } from "../../services/chat";
+import { Conversation, getConversation, sendMsg } from "../../services/chat";
 import { RootState } from "../../store";
 
 export interface ChatState {
@@ -22,6 +22,8 @@ export const chatSlice = createSlice({
     builder.addCase(selectConversation.fulfilled, (state, action) => {
       state.currentConversation = action.payload;
     });
+
+    builder.addCase(sendMessage.fulfilled, (state, action) => {});
   },
 });
 
@@ -29,6 +31,13 @@ export const selectConversation = createAsyncThunk(
   "chat/selectConversation",
   async (pk: string) => {
     return await getConversation(pk);
+  }
+);
+
+export const sendMessage = createAsyncThunk(
+  "chat/sendMsg",
+  async ({ pk, content }: { pk: string; content: string }) => {
+    return await sendMsg(pk, content);
   }
 );
 
