@@ -1,4 +1,5 @@
 use log::{debug, error, info};
+use tauri::Wry;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::core::{
@@ -159,7 +160,7 @@ async fn handle_broker_event(
 
 pub async fn start_broker(
     mut broker_receiver: mpsc::Receiver<BrokerEvent>,
-    //event_sink: tauri::Window<Wry>,
+    main_window: tauri::Window<Wry>,
 ) {
     let mut core_handle = CoreTaskHandle::new();
 
@@ -171,6 +172,9 @@ pub async fn start_broker(
             match noti {
                 ConvsNotifications::NewMessage(new_msg) => {
                     debug!("{:?}", new_msg);
+                    main_window
+                        .emit("new_message", new_msg)
+                        .expect("Can't communicate back to the main window");
                 }
             }
         }

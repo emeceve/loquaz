@@ -12,7 +12,7 @@ export interface Message {
 }
 export enum MessageSource {
   ME = "Me",
-  THEN = "Then",
+  THEM = "Them",
 }
 export async function getConversation(pk: string): Promise<Conversation> {
   return await invoke("get_conversation", { pk });

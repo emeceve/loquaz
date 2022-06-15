@@ -10,17 +10,18 @@ import { getConfig } from "./services/config";
 import { useDispatch } from "react-redux";
 import { loadConfig, updatedConfig } from "./features/config/configSlice";
 import { useAppDispatch } from "./common/hooks";
+import { receivedNewMessage } from "./features/chat/chatSlice";
+import { Message } from "./services/chat";
 
 function App() {
-  const unlisten = listen("test-event", (ev) => {
-    console.log("Event received");
-    console.log(ev);
-  }).then();
-
   const dispatch = useAppDispatch();
 
   useEffect(() => {
     dispatch(loadConfig());
+
+    listen<Message>("new_message", (ev) => {
+      dispatch(receivedNewMessage(ev.payload));
+    }).catch(console.log);
   }, []);
   return (
     <div className="flex">

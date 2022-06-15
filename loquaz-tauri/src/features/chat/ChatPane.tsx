@@ -1,5 +1,5 @@
 import Button from "../../common/components/Button";
-import React, { FormEvent, useState } from "react";
+import React, { FormEvent, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import { listen } from "@tauri-apps/api/event";
 import { useAppDispatch, useAppSelector } from "../../common/hooks";
@@ -15,6 +15,17 @@ export default function ChatPane() {
   const currentContact = useAppSelector(selectCurrentContact);
   const currentConversation = useAppSelector(selectCurrentConversation);
   const dispatch = useAppDispatch();
+
+  const messagesBottomRef = useRef(null);
+  const scrollToBottom = () => {
+    (messagesBottomRef.current as any)?.scrollIntoView({
+      behavior: "smooth",
+    });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [currentConversation.messages]);
 
   const submitMessage = async (e: FormEvent) => {
     e.preventDefault();
@@ -51,6 +62,7 @@ export default function ChatPane() {
       <div className="flex flex-col flex-1 overflow-y-scroll">
         <ul className="space-y-4 px-4 flex flex-col ">
           {currentConversation.messages.map((msg) => renderMessage(msg))}
+          <div ref={messagesBottomRef} />
         </ul>
       </div>
 

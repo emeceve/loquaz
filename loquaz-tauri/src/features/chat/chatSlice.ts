@@ -1,5 +1,11 @@
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { Conversation, getConversation, sendMsg } from "../../services/chat";
+import {
+  Conversation,
+  getConversation,
+  sendMsg,
+  Message,
+  MessageSource,
+} from "../../services/chat";
 import { RootState } from "../../store";
 
 export interface ChatState {
@@ -16,6 +22,18 @@ export const chatSlice = createSlice({
   reducers: {
     selectedConversation: (state, action: PayloadAction<Conversation>) => {
       state.currentConversation = action.payload;
+    },
+    receivedNewMessage: (state, action: PayloadAction<Message>) => {
+      const { contact, messages } = state.currentConversation;
+      const message = action.payload;
+
+      if (
+        message.source == MessageSource.THEM &&
+        message.ev.pubkey != contact.pk
+      )
+        return;
+
+      state.currentConversation.messages = [...messages, message];
     },
   },
   extraReducers: (builder) => {
@@ -45,5 +63,5 @@ export const selectCurrentConversation = (state: RootState) =>
   state.chat.currentConversation;
 export const selectCurrentContact = (state: RootState) =>
   state.chat.currentConversation.contact;
-export const { selectedConversation } = chatSlice.actions;
+export const { selectedConversation, receivedNewMessage } = chatSlice.actions;
 export default chatSlice.reducer;
