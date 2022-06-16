@@ -7,7 +7,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "tauri-dev": "RUST_LOG=debug tauri dev"
+    "tauri:dev": "RUST_LOG=debug tauri dev"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^1.8.1",
