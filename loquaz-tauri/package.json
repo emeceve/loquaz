@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@reduxjs/toolkit": "^1.8.1",
-    "@tauri-apps/api": "^1.0.0-rc.1",
+    "@tauri-apps/api": "^1.0.0-rc.7",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "react-hook-form": "^7.28.1",
@@ -19,7 +19,7 @@
     "react-router-dom": "^6.2.2"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^1.0.0-rc.5",
+    "@tauri-apps/cli": "^1.0.0-rc.16",
     "@types/react": "^17.0.33",
     "@types/react-dom": "^17.0.10",
     "@vitejs/plugin-react": "^1.0.7",
