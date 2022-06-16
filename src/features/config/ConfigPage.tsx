@@ -1,11 +1,10 @@
 import Button from "../../common/components/Button";
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import {
   loadConfig,
   addContact,
   selectKeys,
-  Contact,
   removeContact,
   removeRelay,
   addRelay,
@@ -14,6 +13,7 @@ import {
   resetKeys,
 } from "./configSlice";
 import { useAppDispatch, useAppSelector } from "../../common/hooks";
+import { Contact } from "../../services/config";
 
 export default function ConfigPage() {
   const configState = useAppSelector((state) => state.config);
@@ -32,7 +32,7 @@ export default function ConfigPage() {
     dispatch(loadConfig());
   }, []);
 
-  const submitRestoreKey = ({ sk }) => {
+  const submitRestoreKey = ({ sk }: { sk: string }) => {
     dispatch(restoreKeyPair(sk));
   };
   const clickGenerateKeyPair = () => {
@@ -44,7 +44,7 @@ export default function ConfigPage() {
     restoreKeyForm.reset();
   };
 
-  const submitAddContact = (data) => {
+  const submitAddContact = (data: any) => {
     dispatch(addContact(data));
     contactForm.reset();
   };
@@ -52,7 +52,7 @@ export default function ConfigPage() {
   const clickRemoveContact = (contact: Contact) => {
     dispatch(removeContact(contact));
   };
-  const submitAddRelay = ({ url }) => {
+  const submitAddRelay = ({ url }: any) => {
     dispatch(addRelay(url));
     relayForm.reset();
   };

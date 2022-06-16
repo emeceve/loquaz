@@ -6,7 +6,7 @@ export default function Button({
   submit = false,
 }: {
   children: React.ReactNode;
-  onClick?: (e: React.MouseEvent) => {};
+  onClick?: (e: React.MouseEvent) => void;
   submit?: boolean;
 }) {
   return (
